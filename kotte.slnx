@@ -1,7 +1,6 @@
 <Solution>
   <Configurations>
     <Platform Name="x64" />
-    <Platform Name="x86" />
   </Configurations>
-  <Project Path="kotte/kotte.vcxproj" />
+  <Project Path="kotte/kotte.vcxproj" Id="c935df74-ae18-4bb7-a521-25d4209fe7d5" />
 </Solution>
