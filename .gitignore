@@ -1,0 +1,72 @@
+# Build and IDE directories
+# These directories contain compiled outputs, intermediate files, and IDE-specific 
+# settings. They can be regenerated from source code, so there's no need to version 
+# control them. Including them would bloat the repository and cause merge conflicts.
+build/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+arm/      # ARM architecture builds
+arm64/    # ARM64 architecture builds
+Win32/    # 32-bit Windows builds
+[Bb]in/
+[Oo]bj/
+.vs/
+ 
+# Compiled files
+# Binary and intermediate compilation files that are generated during the build process.
+# These should never be version controlled as they:
+# 1. Are platform-specific and should be built for the target environment
+# 2. Can be recreated from source code
+# 3. Would cause unnecessary conflicts in version control
+*.exe     # Executable files
+*.lib     # Static libraries
+*.dll     # Dynamic-link libraries
+*.so      # Shared object files
+*.pdb     # Program debug database
+*.idb     # Intermediate debug database
+*.sdf     # SQL Server Compact database file
+*.opensdf # Alternative database file format
+*.cache   # Cached build artifacts
+*.ilk     # Incremental linking files
+*.obj     # Object files
+*.exp     # Export files
+*.iobj    # Incremental object files
+*.ipdb    # Incremental program database files
+ 
+# Visual Studio files
+# IDE-specific files that contain user preferences, layout settings, and debugging 
+# configurations. These are specific to each developer's environment and shouldn't 
+# be shared across the team.
+*.user
+*.filters
+*.suo
+*.userosscache
+*.sln.docstates
+*.vcxproj.user
+ 
+# Temporary files
+# Files created during development that are not needed for the build process.
+# These are usually debug logs, editor temporary files, and IDE caches.
+*.log     # Log files
+*.tlog    # Task logs
+*.tmp     # Temporary files
+ipch/     # IntelliSense precompiled headers
+*.aps     # Visual Studio resource files
+*.ncb     # No compile browse database
+ 
+# Test Results
+# Output from running tests - these should be generated on demand and not stored
+# in version control, as they'll differ between machines and test runs.
+TestResults/
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+ 
+# Keep vendor files
+# Exception to allow committing third-party dependencies in the vendor directory.
+# This can be useful when you want to:
+# 1. Ensure specific versions of dependencies are always available
+# 2. Make builds reproducible without external package managers
+# 3. Protect against upstream package deletions
+!/vendor/**/*   # Keep vendor directory
