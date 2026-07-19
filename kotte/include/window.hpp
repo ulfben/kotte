@@ -1,19 +1,18 @@
 #pragma once
-
 #include <raylib.h>
 #include <string_view>
 
 namespace kotte
 {
-	class DrawScopeGuard final{
+	class Frame final{
 	public:
-		explicit DrawScopeGuard(Color clear) noexcept;
-		~DrawScopeGuard() noexcept;
+		explicit Frame(Color clear) noexcept;
+		~Frame() noexcept;
 
-		DrawScopeGuard(const DrawScopeGuard&) = delete;
-		DrawScopeGuard& operator=(const DrawScopeGuard&) = delete;
-		DrawScopeGuard(DrawScopeGuard&&) = delete;
-		DrawScopeGuard& operator=(DrawScopeGuard&&) = delete;
+		Frame(const Frame&) = delete;
+		Frame& operator=(const Frame&) = delete;
+		Frame(Frame&&) = delete;
+		Frame& operator=(Frame&&) = delete;
 	};
 
 	class Window final{
@@ -28,5 +27,8 @@ namespace kotte
 		Window& operator=(Window&&) = delete;
 
 		[[nodiscard]] bool should_close() const noexcept;
+		[[nodiscard]] int width() const noexcept;
+		[[nodiscard]] int height() const noexcept;
+		[[nodiscard]] Vector2 size() const noexcept;
 	};
 }
