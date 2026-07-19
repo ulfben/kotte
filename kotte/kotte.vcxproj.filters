@@ -24,15 +24,21 @@
     <ClCompile Include="src\application.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\tile_map.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="include\kotte.hpp">
+    <ClInclude Include="include\kotte\window.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\window.hpp">
+    <ClInclude Include="include\kotte\application.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\application.hpp">
+    <ClInclude Include="include\kotte\random.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\kotte\tile_map.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
