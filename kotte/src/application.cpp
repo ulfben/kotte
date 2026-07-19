@@ -1,10 +1,13 @@
 #include "application.hpp"
 
 namespace kotte
-{
-    
-    Application::Application()
-        : window_{1280, 720, "Kotte"}{
+{    
+    Application::Application(
+        int width,
+        int height,
+        std::string_view title,
+        int target_fps)
+        : window_{width, height, title, target_fps}{
     }
 
     void Application::run(){
