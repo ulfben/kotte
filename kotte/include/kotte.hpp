@@ -1,9 +1,9 @@
 #pragma once
 #include <cassert>
+#include <cstdint>
+#include <raylib.h>
 #include <string_view>
 #include <vector>
-#include <raylib.h>
-#include <cstdint>
 
 namespace kotte
 {
@@ -15,4 +15,8 @@ namespace kotte
     using i16 = std::int16_t;
     using u8 = std::uint8_t; //NOTE: std::uint8_t is commonly an alias for 'unsigned char', so streams may treat it as a character.
     using i8 = std::int8_t;
+
+
 }
+
+#include "window.hpp"
