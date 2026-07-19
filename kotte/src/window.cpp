@@ -5,13 +5,12 @@
 
 namespace kotte
 {
-    DrawScopeGuard::DrawScopeGuard(Color clear) noexcept{
+    Frame::Frame(Color clear) noexcept{
         BeginDrawing();
         ClearBackground(clear);
     }
 
-    DrawScopeGuard::~DrawScopeGuard() noexcept{
-        DrawFPS(GetScreenWidth() - 100, 2);
+    Frame::~Frame() noexcept{        
         EndDrawing();
     }
 
@@ -38,8 +37,18 @@ namespace kotte
     }
 
     bool Window::should_close() const noexcept{
-        return WindowShouldClose()
-            || IsKeyPressed(KEY_ESCAPE)
-            || IsKeyPressed(KEY_Q);
+        return WindowShouldClose();
+    }
+
+    int Window::width() const noexcept{
+        return GetScreenWidth();
+    }
+
+    int Window::height() const noexcept{
+        return GetScreenHeight();
+    }
+
+    Vector2 Window::size() const noexcept{
+        return {static_cast<float>(width()), static_cast<float>(height())};
     }
 }
