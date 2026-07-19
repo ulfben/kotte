@@ -7,7 +7,11 @@ namespace kotte
 
     class Application final{
     public:
-        Application();
+        Application(
+            int window_width,
+            int window_height,
+            std::string_view title,
+            int target_fps = 0);
 
         Application(const Application&) = delete;
         Application& operator=(const Application&) = delete;
