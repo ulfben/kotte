@@ -1,5 +1,8 @@
 #include "kotte/application.hpp"
 
+#include <format>
+#include <string>
+
 namespace kotte
 {    
     Application::Application(
@@ -86,14 +89,32 @@ namespace kotte
             tile_size_ * 0.3f,
             player_color_);
 
+        std::string diagnostics;
+
         DrawFPS(GetScreenWidth() - 100, 2);
-        DrawText(TextFormat("seed: %llu", static_cast<unsigned long long>(seed_)), 10, 10, 20, RAYWHITE);
-        DrawText(TextFormat("world: %d x %d tiles | %zu total", map_.width(), map_.height(), map_.tile_count()), 10, 34, 20, RAYWHITE);
-        DrawText(TextFormat("view: (%.0f, %.0f) %.0f x %.0f world pixels", world_view.x, world_view.y, world_view.width, world_view.height), 10, 58, 20, RAYWHITE);
-        DrawText(TextFormat("visible range: %d x %d tiles", visible_tiles.past_last_column - visible_tiles.first_column, visible_tiles.past_last_row - visible_tiles.first_row), 10, 82, 20, RAYWHITE);
+        diagnostics = std::format("seed: {}", seed_);
+        DrawText(diagnostics.c_str(), 10, 10, 20, RAYWHITE);
+
+        diagnostics = std::format(
+            "world: {} x {} tiles | {} total", map_.width(), map_.height(), map_.tile_count());
+        DrawText(diagnostics.c_str(), 10, 34, 20, RAYWHITE);
+
+        diagnostics = std::format(
+            "view: ({:.0f}, {:.0f}) {:.0f} x {:.0f} world pixels", world_view.x, world_view.y, world_view.width, world_view.height);
+        DrawText(diagnostics.c_str(), 10, 58, 20, RAYWHITE);
+
+        diagnostics = std::format(
+            "visible range: {} x {} tiles", visible_tiles.past_last_column - visible_tiles.first_column, visible_tiles.past_last_row - visible_tiles.first_row);
+        DrawText(diagnostics.c_str(), 10, 82, 20, RAYWHITE);
+
         const double percent_of_world = map_.tile_count() == 0 ? 0.0 : 100.0 * static_cast<double>(tiles_rendered) / static_cast<double>(map_.tile_count());
-        DrawText(TextFormat("tiles rendered: %zu (%.1f%% of world)", tiles_rendered, percent_of_world), 10, 106, 20, RAYWHITE);
-        DrawText(TextFormat("range: columns [%d, %d) | rows [%d, %d)", visible_tiles.first_column, visible_tiles.past_last_column, visible_tiles.first_row, visible_tiles.past_last_row), 10, 130, 20, RAYWHITE);
+        diagnostics = std::format(
+            "tiles rendered: {} ({:.1f}% of world)", tiles_rendered, percent_of_world);
+        DrawText(diagnostics.c_str(), 10, 106, 20, RAYWHITE);
+
+        diagnostics = std::format(
+            "range: columns [{}, {}) | rows [{}, {})", visible_tiles.first_column, visible_tiles.past_last_column, visible_tiles.first_row, visible_tiles.past_last_row);
+        DrawText(diagnostics.c_str(), 10, 130, 20, RAYWHITE);
         DrawText("move: WASD/arrows | quit: Q/Escape", 10, window_.height() - 30, 20, LIGHTGRAY);
     }
 
