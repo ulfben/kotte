@@ -26,16 +26,16 @@ namespace kotte
             request_exit();
         }
 
-        if(IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A)){
+        if(IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)){
             try_move_player(-1, 0);
         }
-        if(IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D)){
+        if(IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)){
             try_move_player(1, 0);
         }
-        if(IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)){
+        if(IsKeyDown(KEY_UP) || IsKeyDown(KEY_W)){
             try_move_player(0, -1);
         }
-        if(IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)){
+        if(IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S)){
             try_move_player(0, 1);
         }
 
