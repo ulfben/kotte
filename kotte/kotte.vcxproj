@@ -104,12 +104,14 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\application.cpp" />
+    <ClCompile Include="src\camera.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\tile_map.cpp" />
     <ClCompile Include="src\window.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\kotte\application.hpp" />
+    <ClInclude Include="include\kotte\camera.hpp" />
     <ClInclude Include="include\kotte\random.hpp" />
     <ClInclude Include="include\kotte\tile_map.hpp" />
     <ClInclude Include="include\kotte\window.hpp" />

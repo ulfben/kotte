@@ -1,5 +1,6 @@
 #pragma once
 
+#include "kotte/camera.hpp"
 #include "kotte/random.hpp"
 #include "kotte/tile_map.hpp"
 #include "kotte/window.hpp"
@@ -27,8 +28,10 @@ namespace kotte
 
     private:
         void update(float delta_time);
+        void update_camera(float delta_time) noexcept;
         void render() const;
         void try_move_player(int delta_x, int delta_y);
+        [[nodiscard]] Vector2 player_world_centre() const noexcept;
         static constexpr int tile_size_ = 40;
         static constexpr Color background_color_{0x11, 0x22, 0x33, 0xff};
         static constexpr Color floor_colors_[3]{
@@ -40,6 +43,7 @@ namespace kotte
         static constexpr Color wall_color_{0x78, 0x5f, 0x47, 0xff};
 
         Window window_; // Constructed first, destroyed last.
+        Camera camera_;
         Random random_;
         TileMap map_;
         std::uint64_t seed_;
