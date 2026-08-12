@@ -1,5 +1,7 @@
 #include "kotte/tile_map.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <stdexcept>
 
 namespace kotte
@@ -37,6 +39,25 @@ namespace kotte
 
     const Tile& TileMap::at(int x, int y) const{
         return tiles_.at(index(x, y));
+    }
+
+    TileRange TileMap::tiles_overlapping(Rectangle world_view, int tile_size) const noexcept{
+        if(tile_size <= 0){
+            return {};
+        }
+
+        const float tile_extent = static_cast<float>(tile_size);
+        const int first_column = static_cast<int>(std::floor(world_view.x / tile_extent));
+        const int first_row = static_cast<int>(std::floor(world_view.y / tile_extent));
+        const int past_last_column = static_cast<int>(std::ceil((world_view.x + world_view.width) / tile_extent));
+        const int past_last_row = static_cast<int>(std::ceil((world_view.y + world_view.height) / tile_extent));
+
+        return {
+            std::clamp(first_column, 0, width_),
+            std::clamp(first_row, 0, height_),
+            std::clamp(past_last_column, 0, width_),
+            std::clamp(past_last_row, 0, height_)
+        };
     }
 
     std::size_t TileMap::index(int x, int y) const{

@@ -52,8 +52,12 @@ namespace kotte
     void Application::render() const{
         Frame frame{background_color_};
 
-        for(int y = 0; y < map_.height(); ++y){
-            for(int x = 0; x < map_.width(); ++x){
+        const Rectangle world_view = camera_.world_view();
+        const TileRange visible_tiles = map_.tiles_overlapping(world_view, tile_size_);
+        std::size_t tiles_rendered = 0;
+
+        for(int y = visible_tiles.first_row; y < visible_tiles.past_last_row; ++y){
+            for(int x = visible_tiles.first_column; x < visible_tiles.past_last_column; ++x){
                 const Tile& tile = map_.at(x, y);
                 const Color color = tile.type == TileType::wall
                     ? wall_color_
@@ -71,6 +75,7 @@ namespace kotte
                     tile_size_ - 1,
                     tile_size_ - 1,
                     color);
+                ++tiles_rendered;
             }
         }
 
@@ -83,7 +88,12 @@ namespace kotte
 
         DrawFPS(GetScreenWidth() - 100, 2);
         DrawText(TextFormat("seed: %llu", static_cast<unsigned long long>(seed_)), 10, 10, 20, RAYWHITE);
-        DrawText(TextFormat("tiles: %zu / %zu drawn", map_.tile_count(), map_.tile_count()), 10, 34, 20, RAYWHITE);
+        DrawText(TextFormat("world: %d x %d tiles | %zu total", map_.width(), map_.height(), map_.tile_count()), 10, 34, 20, RAYWHITE);
+        DrawText(TextFormat("view: (%.0f, %.0f) %.0f x %.0f world pixels", world_view.x, world_view.y, world_view.width, world_view.height), 10, 58, 20, RAYWHITE);
+        DrawText(TextFormat("visible range: %d x %d tiles", visible_tiles.past_last_column - visible_tiles.first_column, visible_tiles.past_last_row - visible_tiles.first_row), 10, 82, 20, RAYWHITE);
+        const double percent_of_world = map_.tile_count() == 0 ? 0.0 : 100.0 * static_cast<double>(tiles_rendered) / static_cast<double>(map_.tile_count());
+        DrawText(TextFormat("tiles rendered: %zu (%.1f%% of world)", tiles_rendered, percent_of_world), 10, 106, 20, RAYWHITE);
+        DrawText(TextFormat("range: columns [%d, %d) | rows [%d, %d)", visible_tiles.first_column, visible_tiles.past_last_column, visible_tiles.first_row, visible_tiles.past_last_row), 10, 130, 20, RAYWHITE);
         DrawText("move: WASD/arrows | quit: Q/Escape", 10, window_.height() - 30, 20, LIGHTGRAY);
     }
 

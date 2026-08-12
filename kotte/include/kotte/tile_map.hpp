@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <raylib.h>
 #include <vector>
 
 namespace kotte
@@ -18,6 +19,13 @@ namespace kotte
         std::uint8_t variation = 0;
     };
 
+    struct TileRange final {
+        int first_column = 0;
+        int first_row = 0;
+        int past_last_column = 0;
+        int past_last_row = 0;
+    };
+
     class TileMap final {
     public:
         TileMap(int width, int height);
@@ -29,6 +37,8 @@ namespace kotte
 
         [[nodiscard]] Tile& at(int x, int y);
         [[nodiscard]] const Tile& at(int x, int y) const;
+
+        [[nodiscard]] TileRange tiles_overlapping(Rectangle world_view, int tile_size) const noexcept;
 
     private:
         [[nodiscard]] std::size_t index(int x, int y) const;
