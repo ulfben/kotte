@@ -4,7 +4,7 @@ This directory contains the subset of [`ulfben/cpp_prngs`](https://github.com/ul
 
 - Upstream revision: `688fdf4556389fbbe244c71b480359a880b7386d`
 - Retrieved: 2026-07-19
-- Local modifications: none
+- Local modifications: restructured random.hpp for readability, clarify comments, adjust concept.hpp to match current release.
 - License: MIT; see [`LICENSE.md`](LICENSE.md)
 
 The vendored headers are intentionally pinned. Update them from upstream as a reviewed dependency change rather than editing them locally.

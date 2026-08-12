@@ -39,7 +39,7 @@ namespace kotte
             try_move_player(0, 1);
         }
 
-        (void) dt;
+        (void) dt; //Q&D: avoid warning about unused argument.
     }
 
     void Application::render() const{
