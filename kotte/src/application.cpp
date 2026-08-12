@@ -10,7 +10,7 @@ namespace kotte
         int target_fps)
         : window_{width, height, title, target_fps}
         , random_{seed}
-        , map_{make_room(20, 12, random_)}
+        , map_{make_room(200, 120, random_)}
         , seed_{seed}{
     }
 
