@@ -110,9 +110,17 @@ namespace kotte
             }
         }
 
+        std::size_t entities_tested = 0;
+        std::size_t visible_entities = 0;
         std::size_t entity_draw_submissions = 0;
         for(const Entity& entity : entities_){
             Rectangle bounds = entity_world_bounds(entity);
+            ++entities_tested;
+            if(!CheckCollisionRecs(bounds, world_view)){
+                continue;
+            }
+
+            ++visible_entities;
             const Vector2 screen_position = camera_.world_to_screen({bounds.x, bounds.y});
             bounds.x = screen_position.x;
             bounds.y = screen_position.y;
@@ -148,7 +156,8 @@ namespace kotte
         DrawText(diagnostics.c_str(), 10, 130, 20, RAYWHITE);
 
         diagnostics = std::format(
-            "entities: {} total | {} draw submissions", entities_.size(), entity_draw_submissions);
+            "entities: {} total | {} tested | {} visible | {} draw submissions",
+            entities_.size(), entities_tested, visible_entities, entity_draw_submissions);
         DrawText(diagnostics.c_str(), 10, 154, 20, RAYWHITE);
         DrawText("move: WASD/arrows | quit: Q/Escape", 10, window_.height() - 30, 20, LIGHTGRAY);
     }
