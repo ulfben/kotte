@@ -31,9 +31,9 @@ namespace kotte
 
     private:
         void update(float delta_time);
+        void update_player(float delta_time) noexcept;
         void update_camera(float delta_time) noexcept;
         void render() const;
-        void try_move_player(int delta_x, int delta_y);
         void populate_entities();
         [[nodiscard]] Entity& player() noexcept;
         [[nodiscard]] const Entity& player() const noexcept;
@@ -41,6 +41,7 @@ namespace kotte
         [[nodiscard]] static Color entity_color(EntityKind kind) noexcept;
         [[nodiscard]] static float entity_roundness(EntityKind kind) noexcept;
         static constexpr int tile_size_ = 40;
+        static constexpr float player_speed_ = 240.0f;
         static constexpr Color background_color_{0x11, 0x22, 0x33, 0xff};
         static constexpr Color floor_colors_[3]{
             Color{0x38, 0x49, 0x52, 0xff},

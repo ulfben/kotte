@@ -1,5 +1,7 @@
 #include "kotte/application.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <format>
 #include <string>
 
@@ -31,20 +33,45 @@ namespace kotte
             request_exit();
         }
 
+        update_player(delta_time);
+        update_camera(delta_time);
+    }
+
+    void Application::update_player(float delta_time) noexcept{
+        Vector2 direction{};
         if(IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)){
-            try_move_player(-1, 0);
+            direction.x -= 1.0f;
         }
         if(IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)){
-            try_move_player(1, 0);
+            direction.x += 1.0f;
         }
         if(IsKeyDown(KEY_UP) || IsKeyDown(KEY_W)){
-            try_move_player(0, -1);
+            direction.y -= 1.0f;
         }
         if(IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S)){
-            try_move_player(0, 1);
+            direction.y += 1.0f;
         }
 
-        update_camera(delta_time);
+        const float length_squared = direction.x * direction.x + direction.y * direction.y;
+        if(length_squared > 0.0f){
+            const float inverse_length = 1.0f / std::sqrt(length_squared);
+            direction.x *= inverse_length;
+            direction.y *= inverse_length;
+        }
+
+        Entity& player_entity = player();
+        player_entity.world_position.x += direction.x * player_speed_ * delta_time;
+        player_entity.world_position.y += direction.y * player_speed_ * delta_time;
+
+        const Rectangle player_bounds = entity_world_bounds(player_entity);
+        const float left_offset = player_entity.world_position.x - player_bounds.x;
+        const float top_offset = player_entity.world_position.y - player_bounds.y;
+        const float floor_left = static_cast<float>(tile_size_);
+        const float floor_top = static_cast<float>(tile_size_);
+        const float floor_right = static_cast<float>((map_.width() - 1) * tile_size_);
+        const float floor_bottom = static_cast<float>((map_.height() - 1) * tile_size_);
+        player_entity.world_position.x = std::clamp(player_entity.world_position.x, floor_left + left_offset, floor_right - left_offset);
+        player_entity.world_position.y = std::clamp(player_entity.world_position.y, floor_top + top_offset, floor_bottom);
     }
 
     void Application::update_camera(float delta_time) noexcept{
@@ -124,22 +151,6 @@ namespace kotte
             "entities: {} total | {} draw submissions", entities_.size(), entity_draw_submissions);
         DrawText(diagnostics.c_str(), 10, 154, 20, RAYWHITE);
         DrawText("move: WASD/arrows | quit: Q/Escape", 10, window_.height() - 30, 20, LIGHTGRAY);
-    }
-
-    void Application::try_move_player(int delta_x, int delta_y){
-        Entity& player_entity = player();
-        const int player_x = static_cast<int>(player_entity.world_position.x) / tile_size_;
-        const int player_y = static_cast<int>(player_entity.world_position.y) / tile_size_;
-        const int destination_x = player_x + delta_x;
-        const int destination_y = player_y + delta_y;
-
-        if(map_.contains(destination_x, destination_y)
-            && map_.at(destination_x, destination_y).type != TileType::wall){
-            player_entity.world_position = {
-                static_cast<float>(destination_x * tile_size_ + tile_size_ / 2),
-                static_cast<float>(destination_y * tile_size_ + tile_size_ / 2)
-            };
-        }
     }
 
     void Application::populate_entities(){
