@@ -1,0 +1,15 @@
+Bombman 2D Resources
+
+Created by drummyfish.
+
+Source:
+https://opengameart.org/content/bombman-2d-resources
+
+License:
+CC0 1.0 Universal (public domain dedication).
+
+These assets may be used, modified, copied, and redistributed for personal,
+educational, or commercial projects without permission or attribution.
+
+Attribution is not required. If credit is desired, credit drummyfish and link
+to the source page above.
