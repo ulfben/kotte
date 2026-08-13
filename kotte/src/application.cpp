@@ -101,8 +101,8 @@ namespace kotte
                 const Vector2 tile_screen_position = camera_.world_to_screen(tile_world_position);
 
                 DrawRectangle(
-                    static_cast<int>(tile_screen_position.x),
-                    static_cast<int>(tile_screen_position.y),
+                    static_cast<int>(std::floor(tile_screen_position.x)),
+                    static_cast<int>(std::floor(tile_screen_position.y)),
                     tile_size_ - 1,
                     tile_size_ - 1,
                     color);
