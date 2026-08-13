@@ -24,6 +24,7 @@ namespace kotte
     public:
         void clear() noexcept;
         void submit(RenderCommand command);
+        void sort();
         void execute() const;
         [[nodiscard]] std::size_t command_count() const noexcept;
 

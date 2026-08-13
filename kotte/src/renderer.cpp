@@ -1,5 +1,7 @@
 #include "kotte/renderer.hpp"
 
+#include <algorithm>
+
 namespace kotte
 {
     void Renderer::clear() noexcept{
@@ -8,6 +10,15 @@ namespace kotte
 
     void Renderer::submit(RenderCommand command){
         commands_.push_back(command);
+    }
+
+    void Renderer::sort(){
+        std::ranges::sort(commands_, [](const RenderCommand& left, const RenderCommand& right){
+            if(left.layer != right.layer){
+                return left.layer < right.layer;
+            }
+            return left.depth < right.depth;
+        });
     }
 
     void Renderer::execute() const{

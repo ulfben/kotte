@@ -127,6 +127,7 @@ namespace kotte
             const RenderLayer layer = entity.kind == EntityKind::bomb ? RenderLayer::ground : RenderLayer::world;
             renderer_.submit({bounds, entity_color(entity.kind), layer, entity.world_position.y, entity_roundness(entity.kind)});
         }
+        renderer_.sort();
         renderer_.execute();
 
         std::string diagnostics;
