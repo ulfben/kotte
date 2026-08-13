@@ -112,6 +112,7 @@
   <ItemGroup>
     <ClInclude Include="include\kotte\application.hpp" />
     <ClInclude Include="include\kotte\camera.hpp" />
+    <ClInclude Include="include\kotte\entity.hpp" />
     <ClInclude Include="include\kotte\random.hpp" />
     <ClInclude Include="include\kotte\tile_map.hpp" />
     <ClInclude Include="include\kotte\window.hpp" />

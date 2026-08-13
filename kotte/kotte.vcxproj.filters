@@ -41,6 +41,9 @@
     <ClInclude Include="include\kotte\camera.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="include\kotte\entity.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="include\kotte\random.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
