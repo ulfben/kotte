@@ -1,8 +1,8 @@
 #include "kotte/application.hpp"
 
-#include <algorithm>
 #include <cmath>
 #include <format>
+#include <raymath.h>
 #include <string>
 
 namespace kotte
@@ -52,26 +52,18 @@ namespace kotte
             direction.y += 1.0f;
         }
 
-        const float length_squared = direction.x * direction.x + direction.y * direction.y;
-        if(length_squared > 0.0f){
-            const float inverse_length = 1.0f / std::sqrt(length_squared);
-            direction.x *= inverse_length;
-            direction.y *= inverse_length;
-        }
-
         Entity& player_entity = player();
-        player_entity.world_position.x += direction.x * player_speed_ * delta_time;
-        player_entity.world_position.y += direction.y * player_speed_ * delta_time;
+        player_entity.world_position += direction * (player_speed_ * delta_time);
 
         const Rectangle player_bounds = entity_world_bounds(player_entity);
-        const float left_offset = player_entity.world_position.x - player_bounds.x;
-        const float top_offset = player_entity.world_position.y - player_bounds.y;
+        const Vector2 bounds_offset = player_entity.world_position - Vector2{player_bounds.x, player_bounds.y};
         const float floor_left = static_cast<float>(tile_size_);
         const float floor_top = static_cast<float>(tile_size_);
         const float floor_right = static_cast<float>((map_.width() - 1) * tile_size_);
         const float floor_bottom = static_cast<float>((map_.height() - 1) * tile_size_);
-        player_entity.world_position.x = std::clamp(player_entity.world_position.x, floor_left + left_offset, floor_right - left_offset);
-        player_entity.world_position.y = std::clamp(player_entity.world_position.y, floor_top + top_offset, floor_bottom);
+        const Vector2 minimum_position{floor_left + bounds_offset.x, floor_top + bounds_offset.y};
+        const Vector2 maximum_position{floor_right - bounds_offset.x, floor_bottom};
+        player_entity.world_position = Vector2Clamp(player_entity.world_position, minimum_position, maximum_position);
     }
 
     void Application::update_camera(float delta_time) noexcept{
@@ -204,12 +196,8 @@ namespace kotte
         case EntityKind::enemy: size = {28.0f, 30.0f}; break;
         }
 
-        return {
-            entity.world_position.x - size.x / 2.0f,
-            entity.world_position.y - size.y,
-            size.x,
-            size.y
-        };
+        const Vector2 top_left = entity.world_position - Vector2{size.x / 2.0f, size.y};
+        return {top_left.x, top_left.y, size.x, size.y};
     }
 
     Color Application::entity_color(EntityKind kind) noexcept{

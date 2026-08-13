@@ -1,5 +1,7 @@
 #include "kotte/camera.hpp"
 
+#include <raymath.h>
+
 namespace kotte
 {
     Camera::Camera(Vector2 viewport_size) noexcept
@@ -15,18 +17,11 @@ namespace kotte
     }
 
     Vector2 Camera::world_to_screen(Vector2 world_position) const noexcept{
-        return {
-            world_position.x - centre_.x + viewport_size_.x / 2.0f,
-            world_position.y - centre_.y + viewport_size_.y / 2.0f
-        };
+        return world_position - centre_ + viewport_size_ / 2.0f;
     }
 
     Rectangle Camera::world_view() const noexcept{
-        return {
-            centre_.x - viewport_size_.x / 2.0f,
-            centre_.y - viewport_size_.y / 2.0f,
-            viewport_size_.x,
-            viewport_size_.y
-        };
+        const Vector2 top_left = centre_ - viewport_size_ / 2.0f;
+        return {top_left.x, top_left.y, viewport_size_.x, viewport_size_.y};
     }
 }
