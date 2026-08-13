@@ -3,6 +3,7 @@
 #include "kotte/camera.hpp"
 #include "kotte/entity.hpp"
 #include "kotte/random.hpp"
+#include "kotte/renderer.hpp"
 #include "kotte/tile_map.hpp"
 #include "kotte/window.hpp"
 
@@ -33,7 +34,7 @@ namespace kotte
         void update(float delta_time);
         void update_player(float delta_time) noexcept;
         void update_camera(float delta_time) noexcept;
-        void render() const;
+        void render();
         void populate_entities();
         [[nodiscard]] Entity& player() noexcept;
         [[nodiscard]] const Entity& player() const noexcept;
@@ -59,6 +60,7 @@ namespace kotte
         Random random_;
         TileMap map_;
         std::vector<Entity> entities_;
+        Renderer renderer_;
         std::uint64_t seed_;
         std::size_t player_index_ = 0;
         bool exit_requested_ = false;

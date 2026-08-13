@@ -80,7 +80,7 @@ namespace kotte
         camera_.set_centre(player().world_position);
     }
 
-    void Application::render() const{
+    void Application::render(){
         Frame frame{background_color_};
 
         const Rectangle world_view = camera_.world_view();
@@ -112,7 +112,7 @@ namespace kotte
 
         std::size_t entities_tested = 0;
         std::size_t visible_entities = 0;
-        std::size_t entity_draw_submissions = 0;
+        renderer_.clear();
         for(const Entity& entity : entities_){
             Rectangle bounds = entity_world_bounds(entity);
             ++entities_tested;
@@ -124,9 +124,10 @@ namespace kotte
             const Vector2 screen_position = camera_.world_to_screen({bounds.x, bounds.y});
             bounds.x = screen_position.x;
             bounds.y = screen_position.y;
-            DrawRectangleRounded(bounds, entity_roundness(entity.kind), 6, entity_color(entity.kind));
-            ++entity_draw_submissions;
+            const RenderLayer layer = entity.kind == EntityKind::bomb ? RenderLayer::ground : RenderLayer::world;
+            renderer_.submit({bounds, entity_color(entity.kind), layer, entity.world_position.y, entity_roundness(entity.kind)});
         }
+        renderer_.execute();
 
         std::string diagnostics;
 
@@ -156,8 +157,8 @@ namespace kotte
         DrawText(diagnostics.c_str(), 10, 130, 20, RAYWHITE);
 
         diagnostics = std::format(
-            "entities: {} total | {} tested | {} visible | {} draw submissions",
-            entities_.size(), entities_tested, visible_entities, entity_draw_submissions);
+            "entities: {} total | {} tested | {} visible | {} commands",
+            entities_.size(), entities_tested, visible_entities, renderer_.command_count());
         DrawText(diagnostics.c_str(), 10, 154, 20, RAYWHITE);
         DrawText("move: WASD/arrows | quit: Q/Escape", 10, window_.height() - 30, 20, LIGHTGRAY);
     }
