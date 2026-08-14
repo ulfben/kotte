@@ -62,6 +62,29 @@ namespace kotte
         insert(entity_index, new_world_bounds);
     }
 
+    SpatialQuery SpatialGrid::query(Rectangle world_bounds) const{
+        SpatialQuery result;
+        const CellRange range = cells_overlapping(world_bounds);
+
+        // First gather every reference from the cells touched by the query.
+        // A large entity may appear in more than one of those cells.
+        for(int row = range.first_row; row < range.past_last_row; ++row){
+            for(int column = range.first_column; column < range.past_last_column; ++column){
+                const Cell& cell = at(column, row);
+                ++result.cells_visited;
+                result.candidate_references += cell.size();
+                result.entity_indices.insert(result.entity_indices.end(), cell.begin(), cell.end());
+            }
+        }
+
+        // Sorting places repeated indices next to each other. Removing them here
+        // ensures that each entity receives one exact test and one command at most.
+        std::ranges::sort(result.entity_indices);
+        const auto duplicate_tail = std::ranges::unique(result.entity_indices);
+        result.entity_indices.erase(duplicate_tail.begin(), duplicate_tail.end());
+        return result;
+    }
+
     int SpatialGrid::columns() const noexcept{
         return columns_;
     }
@@ -93,6 +116,13 @@ namespace kotte
     }
 
     SpatialGrid::Cell& SpatialGrid::at(int column, int row) noexcept{
+        assert(column >= 0 && column < columns_ && row >= 0 && row < rows_);
+        const std::size_t index = static_cast<std::size_t>(row) * static_cast<std::size_t>(columns_)
+            + static_cast<std::size_t>(column);
+        return cells_[index];
+    }
+
+    const SpatialGrid::Cell& SpatialGrid::at(int column, int row) const noexcept{
         assert(column >= 0 && column < columns_ && row >= 0 && row < rows_);
         const std::size_t index = static_cast<std::size_t>(row) * static_cast<std::size_t>(columns_)
             + static_cast<std::size_t>(column);

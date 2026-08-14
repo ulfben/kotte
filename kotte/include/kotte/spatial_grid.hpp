@@ -15,6 +15,12 @@ namespace kotte
         [[nodiscard]] bool operator==(const CellRange&) const noexcept = default;
     };
 
+    struct SpatialQuery final {
+        std::vector<std::size_t> entity_indices;
+        std::size_t cells_visited = 0;
+        std::size_t candidate_references = 0;
+    };
+
     class SpatialGrid final {
     public:
         SpatialGrid(Vector2 world_size, float cell_size);
@@ -26,6 +32,8 @@ namespace kotte
             Rectangle old_world_bounds,
             Rectangle new_world_bounds);
 
+        [[nodiscard]] SpatialQuery query(Rectangle world_bounds) const;
+
         [[nodiscard]] int columns() const noexcept;
         [[nodiscard]] int rows() const noexcept;
         [[nodiscard]] float cell_size() const noexcept;
@@ -35,6 +43,7 @@ namespace kotte
 
         [[nodiscard]] CellRange cells_overlapping(Rectangle world_bounds) const noexcept;
         [[nodiscard]] Cell& at(int column, int row) noexcept;
+        [[nodiscard]] const Cell& at(int column, int row) const noexcept;
 
         float cell_size_;
         int columns_;

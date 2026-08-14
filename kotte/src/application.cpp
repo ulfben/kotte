@@ -110,12 +110,17 @@ namespace kotte
             }
         }
 
-        std::size_t entities_tested = 0;
+        const SpatialQuery spatial_query = spatial_grid_.query(world_view);
+        std::size_t exact_visibility_tests = 0;
         std::size_t visible_entities = 0;
         renderer_.clear();
-        for(const Entity& entity : entities_){
+
+        // The spatial query replaces Week 3's complete entity scan. Its result is
+        // only a candidate list, so every candidate still needs an exact test.
+        for(const std::size_t entity_index : spatial_query.entity_indices){
+            const Entity& entity = entities_[entity_index];
             Rectangle bounds = entity_world_bounds(entity);
-            ++entities_tested;
+            ++exact_visibility_tests;
             if(!CheckCollisionRecs(bounds, world_view)){
                 continue;
             }
@@ -158,9 +163,15 @@ namespace kotte
         DrawText(diagnostics.c_str(), 10, 130, 20, RAYWHITE);
 
         diagnostics = std::format(
-            "entities: {} total | {} tested | {} visible | {} commands",
-            entities_.size(), entities_tested, visible_entities, renderer_.command_count());
+            "spatial: {} x {} cells @ {:.0f} px | {} visited | {} refs",
+            spatial_grid_.columns(), spatial_grid_.rows(), spatial_grid_.cell_size(),
+            spatial_query.cells_visited, spatial_query.candidate_references);
         DrawText(diagnostics.c_str(), 10, 154, 20, RAYWHITE);
+
+        diagnostics = std::format(
+            "entities: {} total | {} exact tests | {} visible | {} commands",
+            entities_.size(), exact_visibility_tests, visible_entities, renderer_.command_count());
+        DrawText(diagnostics.c_str(), 10, 178, 20, RAYWHITE);
         DrawText("move: WASD/arrows | quit: Q/Escape", 10, window_.height() - 30, 20, LIGHTGRAY);
     }
 
