@@ -17,8 +17,12 @@ namespace kotte
         , camera_{window_.size()}
         , random_{seed}
         , map_{make_room(200, 120, random_)}
+        , spatial_grid_{{
+            static_cast<float>(map_.width() * tile_size_),
+            static_cast<float>(map_.height() * tile_size_)}, spatial_cell_size_}
         , seed_{seed}{
         populate_entities();
+        populate_spatial_grid();
     }
 
     void Application::run(){
@@ -53,6 +57,7 @@ namespace kotte
         }
 
         Entity& player_entity = player();
+        const Rectangle old_world_bounds = entity_world_bounds(player_entity);
         player_entity.world_position += direction * (player_speed_ * delta_time);
 
         const Rectangle player_bounds = entity_world_bounds(player_entity);
@@ -64,6 +69,9 @@ namespace kotte
         const Vector2 minimum_position{floor_left + bounds_offset.x, floor_top + bounds_offset.y};
         const Vector2 maximum_position{floor_right - bounds_offset.x, floor_bottom};
         player_entity.world_position = Vector2Clamp(player_entity.world_position, minimum_position, maximum_position);
+
+        const Rectangle new_world_bounds = entity_world_bounds(player_entity);
+        spatial_grid_.update(player_index_, old_world_bounds, new_world_bounds);
     }
 
     void Application::update_camera(float delta_time) noexcept{
@@ -176,6 +184,14 @@ namespace kotte
                 };
                 entities_.push_back({kind, world_position});
             }
+        }
+    }
+
+    void Application::populate_spatial_grid(){
+        // Entity construction is complete before the grid stores indices. Week 4
+        // keeps this vector fixed, so those non-owning indices remain valid.
+        for(std::size_t index = 0; index < entities_.size(); ++index){
+            spatial_grid_.insert(index, entity_world_bounds(entities_[index]));
         }
     }
 
