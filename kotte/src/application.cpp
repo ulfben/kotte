@@ -233,6 +233,35 @@ namespace kotte
         return {top_left.x, top_left.y, size.x, size.y};
     }
 
+    Rectangle Application::entity_collision_bounds(const Entity& entity) const noexcept{
+        // Collision uses a smaller footprint around the part touching the
+        // floor. The complete visual rectangle remains in the spatial grid so
+        // broad-phase queries conservatively find every possible contact.
+        Vector2 size{};
+        switch(entity.kind){
+        case EntityKind::player: size = {20.0f, 16.0f}; break;
+        case EntityKind::bomb: size = {18.0f, 12.0f}; break;
+        case EntityKind::crate: size = {32.0f, 32.0f}; break;
+        case EntityKind::enemy: size = {24.0f, 14.0f}; break;
+        }
+
+        const Vector2 top_left = entity.world_position - Vector2{size.x / 2.0f, size.y};
+        return {top_left.x, top_left.y, size.x, size.y};
+    }
+
+    bool Application::is_solid(EntityKind kind) noexcept{
+        switch(kind){
+        case EntityKind::player:
+        case EntityKind::crate:
+        case EntityKind::enemy:
+            return true;
+        case EntityKind::bomb:
+            return false;
+        }
+
+        return false;
+    }
+
     Color Application::entity_color(EntityKind kind) noexcept{
         switch(kind){
         case EntityKind::player: return player_color_;
