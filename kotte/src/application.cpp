@@ -33,6 +33,8 @@ namespace kotte
     }
 
     void Application::update(float delta_time){
+        collision_diagnostics_ = {};
+
         if(IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_Q)){
             request_exit();
         }
@@ -41,7 +43,7 @@ namespace kotte
         update_camera(delta_time);
     }
 
-    void Application::update_player(float delta_time) noexcept{
+    void Application::update_player(float delta_time){
         Vector2 direction{};
         if(IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)){
             direction.x -= 1.0f;
@@ -64,7 +66,16 @@ namespace kotte
 
         Entity& player_entity = player();
         const Rectangle old_world_bounds = entity_world_bounds(player_entity);
-        player_entity.world_position += direction * (player_speed_ * delta_time);
+        const Vector2 displacement = direction * (player_speed_ * delta_time);
+
+        // Treat the two axes as separate proposed movements. Week 5 will use
+        // this split to let a clear axis slide along a blocked one.
+        if(displacement.x != 0.0f){
+            try_move_player({displacement.x, 0.0f});
+        }
+        if(displacement.y != 0.0f){
+            try_move_player({0.0f, displacement.y});
+        }
 
         const Rectangle player_bounds = entity_world_bounds(player_entity);
         const Vector2 bounds_offset = player_entity.world_position - Vector2{player_bounds.x, player_bounds.y};
@@ -78,6 +89,19 @@ namespace kotte
 
         const Rectangle new_world_bounds = entity_world_bounds(player_entity);
         spatial_grid_.update(player_index_, old_world_bounds, new_world_bounds);
+    }
+
+    void Application::try_move_player(Vector2 axis_displacement){
+        ++collision_diagnostics_.movement_attempts;
+
+        Entity& player_entity = player();
+        const Vector2 proposed_position = player_entity.world_position + axis_displacement;
+        const bool movement_is_blocked = entity_movement_is_blocked(player_index_, proposed_position);
+
+        // This commit deliberately observes collisions without responding yet.
+        // The next small checkpoint will use this fact to reject the move.
+        (void) movement_is_blocked;
+        player_entity.world_position = proposed_position;
     }
 
     void Application::update_camera(float delta_time) noexcept{
@@ -178,6 +202,30 @@ namespace kotte
             "entities: {} total | {} exact tests | {} visible | {} commands",
             entities_.size(), exact_visibility_tests, visible_entities, renderer_.command_count());
         DrawText(diagnostics.c_str(), 10, 178, 20, RAYWHITE);
+
+        diagnostics = std::format(
+            "movement: {} enemies | {} attempts | {} blocked | {} turns",
+            collision_diagnostics_.enemy_updates,
+            collision_diagnostics_.movement_attempts,
+            collision_diagnostics_.blocked_moves,
+            collision_diagnostics_.enemy_turns);
+        DrawText(diagnostics.c_str(), 10, 202, 20, RAYWHITE);
+
+        diagnostics = std::format(
+            "collision: {} queries | {} cells | {} refs | {} candidates",
+            collision_diagnostics_.spatial_queries,
+            collision_diagnostics_.cells_visited,
+            collision_diagnostics_.candidate_references,
+            collision_diagnostics_.unique_candidates);
+        DrawText(diagnostics.c_str(), 10, 226, 20, RAYWHITE);
+
+        diagnostics = std::format(
+            "narrow: {} exact tests | {} contacts | {} boundary blocks",
+            collision_diagnostics_.exact_tests,
+            collision_diagnostics_.contacts,
+            collision_diagnostics_.boundary_blocks);
+        DrawText(diagnostics.c_str(), 10, 250, 20, RAYWHITE);
+
         DrawText("move: WASD/arrows | quit: Q/Escape", 10, window_.height() - 30, 20, LIGHTGRAY);
     }
 
@@ -247,6 +295,59 @@ namespace kotte
 
         const Vector2 top_left = entity.world_position - Vector2{size.x / 2.0f, size.y};
         return {top_left.x, top_left.y, size.x, size.y};
+    }
+
+    bool Application::entity_movement_is_blocked(
+        std::size_t moving_entity_index,
+        Vector2 proposed_position){
+        Entity proposed_entity = entities_[moving_entity_index];
+        proposed_entity.world_position = proposed_position;
+
+        // Room walls are a simple boundary rule in the current map. Test the
+        // complete visual bounds directly before asking the grid about entities.
+        const Rectangle proposed_world_bounds = entity_world_bounds(proposed_entity);
+        const float floor_left = static_cast<float>(tile_size_);
+        const float floor_top = static_cast<float>(tile_size_);
+        const float floor_right = static_cast<float>((map_.width() - 1) * tile_size_);
+        const float floor_bottom = static_cast<float>((map_.height() - 1) * tile_size_);
+        const bool leaves_room = proposed_world_bounds.x < floor_left
+            || proposed_world_bounds.y < floor_top
+            || proposed_world_bounds.x + proposed_world_bounds.width > floor_right
+            || proposed_world_bounds.y + proposed_world_bounds.height > floor_bottom;
+        if(leaves_room){
+            ++collision_diagnostics_.boundary_blocks;
+            return true;
+        }
+
+        const Rectangle proposed_collision_bounds = entity_collision_bounds(proposed_entity);
+        const SpatialQuery spatial_query = spatial_grid_.query(proposed_collision_bounds);
+        ++collision_diagnostics_.spatial_queries;
+        collision_diagnostics_.cells_visited += spatial_query.cells_visited;
+        collision_diagnostics_.candidate_references += spatial_query.candidate_references;
+        collision_diagnostics_.unique_candidates += spatial_query.entity_indices.size();
+
+        bool blocked = false;
+
+        // A spatial query returns possible contacts. Remove the mover and
+        // non-solid kinds before exact-testing the smaller gameplay footprints.
+        for(const std::size_t candidate_index : spatial_query.entity_indices){
+            if(candidate_index == moving_entity_index){
+                continue;
+            }
+
+            const Entity& candidate = entities_[candidate_index];
+            if(!is_solid(candidate.kind)){
+                continue;
+            }
+
+            ++collision_diagnostics_.exact_tests;
+            if(CheckCollisionRecs(proposed_collision_bounds, entity_collision_bounds(candidate))){
+                ++collision_diagnostics_.contacts;
+                blocked = true;
+            }
+        }
+
+        return blocked;
     }
 
     bool Application::is_solid(EntityKind kind) noexcept{

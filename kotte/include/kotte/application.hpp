@@ -47,7 +47,7 @@ namespace kotte
 
     private:
         void update(float delta_time);
-        void update_player(float delta_time) noexcept;
+        void update_player(float delta_time);
         void try_move_player(Vector2 axis_displacement);
         void update_camera(float delta_time) noexcept;
         void render();
