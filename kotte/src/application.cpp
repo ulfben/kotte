@@ -56,6 +56,12 @@ namespace kotte
             direction.y += 1.0f;
         }
 
+        // Two held keys produce a longer diagonal vector. Normalize it so the
+        // player's speed is the same in every direction before scaling it.
+        if(direction.x != 0.0f || direction.y != 0.0f){
+            direction = Vector2Normalize(direction);
+        }
+
         Entity& player_entity = player();
         const Rectangle old_world_bounds = entity_world_bounds(player_entity);
         player_entity.world_position += direction * (player_speed_ * delta_time);
