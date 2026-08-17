@@ -199,65 +199,52 @@ namespace kotte
         renderer_.execute();
 
         std::string diagnostics;
+        const double percent_of_entities = entities_.empty()
+            ? 0.0
+            : 100.0 * static_cast<double>(visible_entities) / static_cast<double>(entities_.size());
+
+        // A naive collision loop would test every entity for every movement
+        // attempt. Compare that full-scan count with the local broad-phase
+        // candidates; this is candidate reduction, not a measured FPS gain.
+        const double naive_collision_work = static_cast<double>(collision_diagnostics_.movement_attempts)
+            * static_cast<double>(entities_.size());
+        const double broad_phase_reduction = naive_collision_work == 0.0
+            ? 0.0
+            : 100.0 * (1.0 - static_cast<double>(collision_diagnostics_.unique_candidates) / naive_collision_work);
 
         DrawFPS(GetScreenWidth() - 100, 2);
-        diagnostics = std::format("seed: {}", seed_);
-        DrawText(diagnostics.c_str(), 10, 10, 20, RAYWHITE);
-
-        diagnostics = std::format(
-            "world: {} x {} tiles | {} total", map_.width(), map_.height(), map_.tile_count());
-        DrawText(diagnostics.c_str(), 10, 34, 20, RAYWHITE);
-
-        diagnostics = std::format(
-            "view: ({:.0f}, {:.0f}) {:.0f} x {:.0f} world pixels", world_view.x, world_view.y, world_view.width, world_view.height);
-        DrawText(diagnostics.c_str(), 10, 58, 20, RAYWHITE);
-
-        diagnostics = std::format(
-            "visible range: {} x {} tiles", visible_tiles.past_last_column - visible_tiles.first_column, visible_tiles.past_last_row - visible_tiles.first_row);
-        DrawText(diagnostics.c_str(), 10, 82, 20, RAYWHITE);
 
         const double percent_of_world = map_.tile_count() == 0 ? 0.0 : 100.0 * static_cast<double>(tiles_rendered) / static_cast<double>(map_.tile_count());
         diagnostics = std::format(
             "tiles rendered: {} ({:.1f}% of world)", tiles_rendered, percent_of_world);
+        DrawText(diagnostics.c_str(), 10, 10, 20, RAYWHITE);
+
+        diagnostics = std::format(
+            "entities: {} visible ({:.1f}% of {}) | {} visibility tests | {} commands",
+            visible_entities, percent_of_entities, entities_.size(), exact_visibility_tests, renderer_.command_count());
+        DrawText(diagnostics.c_str(), 10, 34, 20, RAYWHITE);
+
+        diagnostics = std::format(
+            "enemies updated: {}", collision_diagnostics_.enemy_updates);
+        DrawText(diagnostics.c_str(), 10, 58, 20, RAYWHITE);
+
+        diagnostics = std::format(
+            "broad phase: {} candidates | {:.1f}% fewer than full scan",
+            collision_diagnostics_.unique_candidates, broad_phase_reduction);
+        DrawText(diagnostics.c_str(), 10, 82, 20, RAYWHITE);
+
+        diagnostics = std::format(
+            "narrow phase: {} exact tests | {} contacts",
+            collision_diagnostics_.exact_tests,
+            collision_diagnostics_.contacts);
         DrawText(diagnostics.c_str(), 10, 106, 20, RAYWHITE);
 
-        diagnostics = std::format(
-            "range: columns [{}, {}) | rows [{}, {})", visible_tiles.first_column, visible_tiles.past_last_column, visible_tiles.first_row, visible_tiles.past_last_row);
-        DrawText(diagnostics.c_str(), 10, 130, 20, RAYWHITE);
+        diagnostics = std::format("seed: {}", seed_);
+        DrawText(diagnostics.c_str(), 10, window_.height() - 78, 20, RAYWHITE);
 
         diagnostics = std::format(
-            "spatial: {} x {} cells @ {:.0f} px | {} visited | {} refs",
-            spatial_grid_.columns(), spatial_grid_.rows(), spatial_grid_.cell_size(),
-            spatial_query.cells_visited, spatial_query.candidate_references);
-        DrawText(diagnostics.c_str(), 10, 154, 20, RAYWHITE);
-
-        diagnostics = std::format(
-            "entities: {} total | {} exact tests | {} visible | {} commands",
-            entities_.size(), exact_visibility_tests, visible_entities, renderer_.command_count());
-        DrawText(diagnostics.c_str(), 10, 178, 20, RAYWHITE);
-
-        diagnostics = std::format(
-            "movement: {} enemies | {} attempts | {} blocked | {} turns",
-            collision_diagnostics_.enemy_updates,
-            collision_diagnostics_.movement_attempts,
-            collision_diagnostics_.blocked_moves,
-            collision_diagnostics_.enemy_turns);
-        DrawText(diagnostics.c_str(), 10, 202, 20, RAYWHITE);
-
-        diagnostics = std::format(
-            "collision: {} queries | {} cells | {} refs | {} candidates",
-            collision_diagnostics_.spatial_queries,
-            collision_diagnostics_.cells_visited,
-            collision_diagnostics_.candidate_references,
-            collision_diagnostics_.unique_candidates);
-        DrawText(diagnostics.c_str(), 10, 226, 20, RAYWHITE);
-
-        diagnostics = std::format(
-            "narrow: {} exact tests | {} contacts | {} boundary blocks",
-            collision_diagnostics_.exact_tests,
-            collision_diagnostics_.contacts,
-            collision_diagnostics_.boundary_blocks);
-        DrawText(diagnostics.c_str(), 10, 250, 20, RAYWHITE);
+            "world: {} x {} tiles | {} total", map_.width(), map_.height(), map_.tile_count());
+        DrawText(diagnostics.c_str(), 10, window_.height() - 54, 20, RAYWHITE);
 
         DrawText("move: WASD/arrows | quit: Q/Escape", 10, window_.height() - 30, 20, LIGHTGRAY);
     }

@@ -38,15 +38,13 @@ The tile map retains its more direct Week 2 selection. It converts the camera vi
 The on-screen diagnostics show:
 
 * the complete map dimensions and tile count;
-* the camera's world-space view rectangle;
-* the selected column and row ranges;
 * the number of rendered tiles as a percentage of the complete world;
-* the spatial-grid dimensions and cell size;
-* camera-query cells visited and raw candidate references gathered;
-* total entities, exact visibility tests, visible entities, and render commands;
-* enemy updates, movement attempts, blocked moves, and enemy turns;
-* collision queries, cells visited, raw references, and unique candidates;
-* exact collision tests, contacts, and room-boundary blocks.
+* visible entities as a percentage of the total, visibility tests, and render commands;
+* the number of enemies updated;
+* broad-phase candidates and the reduction compared with a full entity scan;
+* narrow-phase exact tests and contacts.
+
+The lower-left diagnostics also show the seed and world dimensions. The low-level query counters remain available in the source for instructor investigation, but are not placed in the normal student-facing HUD.
 
 The original Week 1 baseline remains available from the `2026-week-01` tag. The Week 2 camera and tile-culling reference remains available from `2026-week-02`. The Week 3 entity-rendering reference remains available from `2026-week-03`, and the Week 4 spatial-query reference remains available from `2026-week-04`.
 
