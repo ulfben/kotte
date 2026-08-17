@@ -40,6 +40,7 @@ namespace kotte
             request_exit();
         }
 
+        // The player and every enemy are movers; each asks its own collision question.
         update_player(delta_time);
         update_enemies(delta_time);
         update_camera(delta_time);
@@ -94,15 +95,20 @@ namespace kotte
     }
 
     void Application::try_move_player(Vector2 axis_displacement){
+        // Propose one horizontal or vertical player movement.
         ++collision_diagnostics_.movement_attempts;
 
         Entity& player_entity = player();
         const Vector2 proposed_position = player_entity.world_position + axis_displacement;
+
+        // Detect possible contacts using the mover's proposed collision bounds.
         if(entity_movement_is_blocked(player_index_, proposed_position)){
+            // Respond by rejecting only this blocked player axis.
             ++collision_diagnostics_.blocked_moves;
             return;
         }
 
+        // Accept the clear proposal; grid synchronization happens after both axes.
         player_entity.world_position = proposed_position;
     }
 
@@ -110,18 +116,20 @@ namespace kotte
         // The update list contains every enemy, not only those returned by the
         // camera query. Off-screen enemies therefore keep simulating normally.
         for(const std::size_t enemy_index : enemy_indices_){
+            // Each enemy is one mover with one cardinal movement attempt.
             ++collision_diagnostics_.enemy_updates;
             ++collision_diagnostics_.movement_attempts;
 
             Entity& enemy = entities_[enemy_index];
             const Rectangle old_world_bounds = entity_world_bounds(enemy);
+            // Propose one cardinal movement for this enemy.
             const Vector2 direction = cardinal_vector(enemy.movement_heading);
             const Vector2 displacement = direction * (enemy_speed_ * delta_time);
             const Vector2 proposed_position = enemy.world_position + displacement;
 
+            // Detect a possible contact using this enemy's proposed bounds.
             if(entity_movement_is_blocked(enemy_index, proposed_position)){
-                // A blocked enemy stays where it is and chooses a genuinely
-                // different heading. It waits until the next update to retry.
+                // Respond by turning without moving; retry the new heading next update.
                 ++collision_diagnostics_.blocked_moves;
                 ++collision_diagnostics_.enemy_turns;
                 enemy.movement_heading = different_enemy_direction(enemy.movement_heading);
@@ -131,8 +139,7 @@ namespace kotte
             enemy.world_position = proposed_position;
             const Rectangle new_world_bounds = entity_world_bounds(enemy);
 
-            // Enemies are also blockers. Synchronize this accepted move now so
-            // the next enemy sees the current position rather than stale cells.
+            // Synchronize this accepted move before the next enemy query.
             spatial_grid_.update(enemy_index, old_world_bounds, new_world_bounds);
         }
     }
@@ -355,16 +362,18 @@ namespace kotte
         }
 
         const Rectangle proposed_collision_bounds = entity_collision_bounds(proposed_entity);
+
+        // Broad phase: query nearby candidates using the proposed bounds.
         const SpatialQuery spatial_query = spatial_grid_.query(proposed_collision_bounds);
         ++collision_diagnostics_.spatial_queries;
         collision_diagnostics_.cells_visited += spatial_query.cells_visited;
         collision_diagnostics_.candidate_references += spatial_query.candidate_references;
+        // These counters aggregate work across movers, not globally unique entities.
         collision_diagnostics_.unique_candidates += spatial_query.entity_indices.size();
 
         bool blocked = false;
 
-        // A spatial query returns possible contacts. Remove the mover and
-        // non-solid kinds before exact-testing the smaller gameplay footprints.
+        // Filter: remove the mover and non-solid kinds before exact testing.
         for(const std::size_t candidate_index : spatial_query.entity_indices){
             if(candidate_index == moving_entity_index){
                 continue;
@@ -375,6 +384,7 @@ namespace kotte
                 continue;
             }
 
+            // Narrow phase: exact-test the remaining solid candidate.
             ++collision_diagnostics_.exact_tests;
             if(CheckCollisionRecs(proposed_collision_bounds, entity_collision_bounds(candidate))){
                 ++collision_diagnostics_.contacts;
