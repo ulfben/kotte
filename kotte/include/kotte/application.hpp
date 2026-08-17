@@ -49,9 +49,11 @@ namespace kotte
         void update(float delta_time);
         void update_player(float delta_time);
         void try_move_player(Vector2 axis_displacement);
+        void update_enemies(float delta_time);
         void update_camera(float delta_time) noexcept;
         void render();
         void populate_entities();
+        void initialize_enemies();
         void populate_spatial_grid();
         [[nodiscard]] Entity& player() noexcept;
         [[nodiscard]] const Entity& player() const noexcept;
@@ -61,12 +63,15 @@ namespace kotte
             std::size_t moving_entity_index,
             Vector2 proposed_position);
         [[nodiscard]] static bool is_solid(EntityKind kind) noexcept;
+        [[nodiscard]] static Vector2 cardinal_vector(CardinalDirection direction) noexcept;
+        [[nodiscard]] CardinalDirection different_enemy_direction(CardinalDirection current_direction);
         [[nodiscard]] static Color entity_color(EntityKind kind) noexcept;
         [[nodiscard]] static float entity_roundness(EntityKind kind) noexcept;
         static constexpr int tile_size_ = 40;
         static constexpr int spatial_cell_tiles_ = 8;
         static constexpr float spatial_cell_size_ = tile_size_ * spatial_cell_tiles_;
         static constexpr float player_speed_ = 240.0f;
+        static constexpr float enemy_speed_ = 80.0f;
         static constexpr Color background_color_{0x11, 0x22, 0x33, 0xff};
         static constexpr Color floor_colors_[3]{
             Color{0x38, 0x49, 0x52, 0xff},
@@ -84,6 +89,7 @@ namespace kotte
         Random random_;
         TileMap map_;
         std::vector<Entity> entities_;
+        std::vector<std::size_t> enemy_indices_;
         SpatialGrid spatial_grid_;
         Renderer renderer_;
         CollisionDiagnostics collision_diagnostics_;

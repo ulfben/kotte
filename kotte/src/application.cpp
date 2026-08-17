@@ -22,6 +22,7 @@ namespace kotte
             static_cast<float>(map_.height() * tile_size_)}, spatial_cell_size_}
         , seed_{seed}{
         populate_entities();
+        initialize_enemies();
         populate_spatial_grid();
     }
 
@@ -40,6 +41,7 @@ namespace kotte
         }
 
         update_player(delta_time);
+        update_enemies(delta_time);
         update_camera(delta_time);
     }
 
@@ -102,6 +104,37 @@ namespace kotte
         }
 
         player_entity.world_position = proposed_position;
+    }
+
+    void Application::update_enemies(float delta_time){
+        // The update list contains every enemy, not only those returned by the
+        // camera query. Off-screen enemies therefore keep simulating normally.
+        for(const std::size_t enemy_index : enemy_indices_){
+            ++collision_diagnostics_.enemy_updates;
+            ++collision_diagnostics_.movement_attempts;
+
+            Entity& enemy = entities_[enemy_index];
+            const Rectangle old_world_bounds = entity_world_bounds(enemy);
+            const Vector2 direction = cardinal_vector(enemy.movement_heading);
+            const Vector2 displacement = direction * (enemy_speed_ * delta_time);
+            const Vector2 proposed_position = enemy.world_position + displacement;
+
+            if(entity_movement_is_blocked(enemy_index, proposed_position)){
+                // A blocked enemy stays where it is and chooses a genuinely
+                // different heading. It waits until the next update to retry.
+                ++collision_diagnostics_.blocked_moves;
+                ++collision_diagnostics_.enemy_turns;
+                enemy.movement_heading = different_enemy_direction(enemy.movement_heading);
+                continue;
+            }
+
+            enemy.world_position = proposed_position;
+            const Rectangle new_world_bounds = entity_world_bounds(enemy);
+
+            // Enemies are also blockers. Synchronize this accepted move now so
+            // the next enemy sees the current position rather than stale cells.
+            spatial_grid_.update(enemy_index, old_world_bounds, new_world_bounds);
+        }
     }
 
     void Application::update_camera(float delta_time) noexcept{
@@ -252,6 +285,21 @@ namespace kotte
         }
     }
 
+    void Application::initialize_enemies(){
+        // Finish every world-generation roll before drawing runtime headings.
+        // This preserves the complete Week 4 layout for the reference seed.
+        for(std::size_t index = 0; index < entities_.size(); ++index){
+            Entity& entity = entities_[index];
+            if(entity.kind != EntityKind::enemy){
+                continue;
+            }
+
+            enemy_indices_.push_back(index);
+            entity.movement_heading = static_cast<CardinalDirection>(
+                random_.next<4, std::uint8_t>());
+        }
+    }
+
     void Application::populate_spatial_grid(){
         // Entity construction is complete before the grid stores indices. Week 4
         // keeps this vector fixed, so those non-owning indices remain valid.
@@ -361,6 +409,30 @@ namespace kotte
         }
 
         return false;
+    }
+
+    Vector2 Application::cardinal_vector(CardinalDirection direction) noexcept{
+        switch(direction){
+        case CardinalDirection::up: return {0.0f, -1.0f};
+        case CardinalDirection::right: return {1.0f, 0.0f};
+        case CardinalDirection::down: return {0.0f, 1.0f};
+        case CardinalDirection::left: return {-1.0f, 0.0f};
+        }
+
+        return {};
+    }
+
+    CardinalDirection Application::different_enemy_direction(CardinalDirection current_direction){
+        constexpr std::uint8_t direction_count = 4;
+        const std::uint8_t current_value = static_cast<std::uint8_t>(current_direction);
+
+        // Adding 1, 2, or 3 modulo four reaches every heading except the one
+        // that was just blocked.
+        const std::uint8_t offset = static_cast<std::uint8_t>(
+            random_.next<3, std::uint8_t>() + 1);
+        const std::uint8_t new_value = static_cast<std::uint8_t>(
+            (current_value + offset) % direction_count);
+        return static_cast<CardinalDirection>(new_value);
     }
 
     Color Application::entity_color(EntityKind kind) noexcept{
