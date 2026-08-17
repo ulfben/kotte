@@ -96,11 +96,11 @@ namespace kotte
 
         Entity& player_entity = player();
         const Vector2 proposed_position = player_entity.world_position + axis_displacement;
-        const bool movement_is_blocked = entity_movement_is_blocked(player_index_, proposed_position);
+        if(entity_movement_is_blocked(player_index_, proposed_position)){
+            ++collision_diagnostics_.blocked_moves;
+            return;
+        }
 
-        // This commit deliberately observes collisions without responding yet.
-        // The next small checkpoint will use this fact to reject the move.
-        (void) movement_is_blocked;
         player_entity.world_position = proposed_position;
     }
 
