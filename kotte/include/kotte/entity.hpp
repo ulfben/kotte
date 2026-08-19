@@ -12,8 +12,16 @@ namespace kotte
         enemy
     };
 
+    enum class CardinalDirection : std::uint8_t {
+        up,
+        right,
+        down,
+        left
+    };
+
     struct Entity final {
         EntityKind kind = EntityKind::crate;
         Vector2 world_position{};
+        CardinalDirection movement_heading = CardinalDirection::right;
     };
 }
