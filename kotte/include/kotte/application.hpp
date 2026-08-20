@@ -64,6 +64,10 @@ namespace kotte
             std::uint8_t blast_range = 0;
         };
 
+        struct DestroyEntityRequest final {
+            EntityHandle entity;
+        };
+
         struct BlastEffect final {
             std::vector<Vector2> tile_centres;
             float remaining_seconds = 0.0f;
@@ -81,14 +85,19 @@ namespace kotte
         void try_move_player(Vector2 axis_displacement);
         void update_enemies(float delta_time);
         void queue_bomb_placement();
+        void apply_entity_destructions();
         void apply_bomb_placements();
+        [[nodiscard]] bool resolve_blast_tile(
+            BlastEffect& effect,
+            int column,
+            int row);
         void append_blast_ray(
             BlastEffect& effect,
             int origin_column,
             int origin_row,
             int column_step,
             int row_step,
-            std::uint8_t range) const;
+            std::uint8_t range);
         void update_camera(float delta_time) noexcept;
         void render();
         void populate_entities();
@@ -143,6 +152,7 @@ namespace kotte
         FrameActions frame_actions_;
         std::vector<PlaceBombRequest> place_bomb_requests_;
         std::vector<BombDetonated> bomb_detonated_facts_;
+        std::vector<DestroyEntityRequest> destroy_entity_requests_;
         std::vector<BlastEffect> blast_effects_;
         CollisionDiagnostics collision_diagnostics_;
         std::uint64_t seed_;

@@ -61,6 +61,7 @@ namespace kotte
         // Every request must be consumed by the previous frame's mutation phase.
         assert(place_bomb_requests_.empty());
         assert(bomb_detonated_facts_.empty());
+        assert(destroy_entity_requests_.empty());
         frame_actions_ = {};
         collision_diagnostics_ = {};
     }
@@ -136,7 +137,11 @@ namespace kotte
             const float tile_extent = static_cast<float>(tile_size_);
             const int origin_column = static_cast<int>(std::floor(fact.world_position.x / tile_extent));
             const int origin_row = static_cast<int>(std::floor(fact.world_position.y / tile_extent));
-            effect.tile_centres.push_back(tile_centre(origin_column, origin_row));
+            (void) resolve_blast_tile(effect, origin_column, origin_row);
+
+            // The detonating bomb must disappear even if its presentation or
+            // collision bounds change independently of blast-tile detection.
+            destroy_entity_requests_.push_back({fact.bomb});
 
             append_blast_ray(effect, origin_column, origin_row, 0, -1, fact.blast_range);
             append_blast_ray(effect, origin_column, origin_row, 1, 0, fact.blast_range);
@@ -151,6 +156,7 @@ namespace kotte
 
     void Application::apply_structural_mutations(){
         // Entity storage and every derived index change only at this boundary.
+        apply_entity_destructions();
         apply_bomb_placements();
     }
 
@@ -285,13 +291,91 @@ namespace kotte
         place_bomb_requests_.clear();
     }
 
+    void Application::apply_entity_destructions(){
+        // A moving entity may overlap several blast tiles, and several bombs may
+        // reach it in one frame. Canonicalizing requests makes that multiplicity
+        // explicit instead of depending on a forgiving destruction order.
+        std::ranges::sort(destroy_entity_requests_, {}, &DestroyEntityRequest::entity);
+        const auto duplicate_tail = std::ranges::unique(
+            destroy_entity_requests_, {}, &DestroyEntityRequest::entity);
+        destroy_entity_requests_.erase(duplicate_tail.begin(), duplicate_tail.end());
+
+        for(const DestroyEntityRequest& request : destroy_entity_requests_){
+            const Entity* doomed = entities_.try_get(request.entity);
+            if(doomed == nullptr){
+                continue;
+            }
+
+            // Spatial membership is derived from the live entity, so remove it
+            // while the handle can still resolve to the bounds used at insertion.
+            spatial_grid_.remove(request.entity, entity_world_bounds(*doomed));
+            const bool destroyed = entities_.destroy(request.entity);
+            assert(destroyed);
+            (void) destroyed;
+        }
+
+        // These update lists are non-owning views. A single cleanup pass keeps
+        // their iteration dense without teaching each destruction source about
+        // every list that happens to reference an entity.
+        std::erase_if(enemy_handles_, [this](EntityHandle handle){
+            return !entities_.contains(handle);
+        });
+        std::erase_if(active_bomb_handles_, [this](EntityHandle handle){
+            return !entities_.contains(handle);
+        });
+
+        destroy_entity_requests_.clear();
+    }
+
+    bool Application::resolve_blast_tile(
+        BlastEffect& effect,
+        int column,
+        int row){
+        const Vector2 centre = tile_centre(column, row);
+        effect.tile_centres.push_back(centre);
+
+        const float tile_extent = static_cast<float>(tile_size_);
+        const Rectangle tile_bounds{
+            static_cast<float>(column) * tile_extent,
+            static_cast<float>(row) * tile_extent,
+            tile_extent,
+            tile_extent
+        };
+        const SpatialQuery contacts = spatial_grid_.query(tile_bounds);
+        bool blocked_by_crate = false;
+
+        for(const EntityHandle handle : contacts.entity_handles){
+            const Entity* candidate = entities_.try_get(handle);
+            if(candidate == nullptr
+                || !CheckCollisionRecs(tile_bounds, entity_collision_bounds(*candidate))){
+                continue;
+            }
+
+            switch(candidate->kind){
+            case EntityKind::bomb:
+            case EntityKind::enemy:
+                destroy_entity_requests_.push_back({handle});
+                break;
+            case EntityKind::crate:
+                destroy_entity_requests_.push_back({handle});
+                blocked_by_crate = true;
+                break;
+            case EntityKind::player:
+                // Player-hit consequences are outside the Week 6 lifetime seam.
+                break;
+            }
+        }
+
+        return blocked_by_crate;
+    }
+
     void Application::append_blast_ray(
         BlastEffect& effect,
         int origin_column,
         int origin_row,
         int column_step,
         int row_step,
-        std::uint8_t range) const{
+        std::uint8_t range){
         for(int distance = 1; distance <= static_cast<int>(range); ++distance){
             const int column = origin_column + column_step * distance;
             const int row = origin_row + row_step * distance;
@@ -299,7 +383,9 @@ namespace kotte
                 break;
             }
 
-            effect.tile_centres.push_back(tile_centre(column, row));
+            if(resolve_blast_tile(effect, column, row)){
+                break;
+            }
         }
     }
 
