@@ -6,6 +6,7 @@
 #include <format>
 #include <raymath.h>
 #include <string>
+#include <utility>
 
 namespace kotte
 {    
@@ -59,6 +60,7 @@ namespace kotte
     void Application::begin_frame() noexcept{
         // Every request must be consumed by the previous frame's mutation phase.
         assert(place_bomb_requests_.empty());
+        assert(bomb_detonated_facts_.empty());
         frame_actions_ = {};
         collision_diagnostics_ = {};
     }
@@ -96,13 +98,55 @@ namespace kotte
         queue_bomb_placement();
     }
 
-    void Application::update_timed_gameplay(float delta_time) noexcept{
-        // Bomb fuses will live here so camera visibility never controls simulation.
-        (void) delta_time;
+    void Application::update_timed_gameplay(float delta_time){
+        // This list is independent of camera queries, so off-screen fuses advance.
+        for(const EntityHandle bomb_handle : active_bomb_handles_){
+            Entity* bomb = entities_.try_get(bomb_handle);
+            if(bomb == nullptr || !bomb->bomb_state.has_value()
+                || bomb->bomb_state->detonation_requested){
+                continue;
+            }
+
+            BombState& state = *bomb->bomb_state;
+            state.fuse_remaining -= delta_time;
+            if(state.fuse_remaining > 0.0f){
+                continue;
+            }
+
+            state.fuse_remaining = 0.0f;
+            state.detonation_requested = true;
+
+            // The fact owns every value needed by later phases; it does not
+            // borrow the bomb that will eventually request its own destruction.
+            bomb_detonated_facts_.push_back({
+                bomb_handle,
+                state.owner,
+                bomb->world_position,
+                state.blast_range
+            });
+        }
     }
 
-    void Application::resolve_gameplay_facts() noexcept{
-        // Producers and consumers remain separate even while this phase is empty.
+    void Application::resolve_gameplay_facts(){
+        for(const BombDetonated& fact : bomb_detonated_facts_){
+            BlastEffect effect;
+            effect.remaining_seconds = blast_effect_seconds_;
+            effect.tile_centres.reserve(static_cast<std::size_t>(fact.blast_range) * 4 + 1);
+
+            const float tile_extent = static_cast<float>(tile_size_);
+            const int origin_column = static_cast<int>(std::floor(fact.world_position.x / tile_extent));
+            const int origin_row = static_cast<int>(std::floor(fact.world_position.y / tile_extent));
+            effect.tile_centres.push_back(tile_centre(origin_column, origin_row));
+
+            append_blast_ray(effect, origin_column, origin_row, 0, -1, fact.blast_range);
+            append_blast_ray(effect, origin_column, origin_row, 1, 0, fact.blast_range);
+            append_blast_ray(effect, origin_column, origin_row, 0, 1, fact.blast_range);
+            append_blast_ray(effect, origin_column, origin_row, -1, 0, fact.blast_range);
+
+            blast_effects_.push_back(std::move(effect));
+        }
+
+        bomb_detonated_facts_.clear();
     }
 
     void Application::apply_structural_mutations(){
@@ -110,7 +154,14 @@ namespace kotte
         apply_bomb_placements();
     }
 
-    void Application::update_presentation(float delta_time) noexcept{
+    void Application::update_presentation(float delta_time){
+        for(BlastEffect& effect : blast_effects_){
+            effect.remaining_seconds -= delta_time;
+        }
+        std::erase_if(blast_effects_, [](const BlastEffect& effect){
+            return effect.remaining_seconds <= 0.0f;
+        });
+
         update_camera(delta_time);
     }
 
@@ -234,6 +285,24 @@ namespace kotte
         place_bomb_requests_.clear();
     }
 
+    void Application::append_blast_ray(
+        BlastEffect& effect,
+        int origin_column,
+        int origin_row,
+        int column_step,
+        int row_step,
+        std::uint8_t range) const{
+        for(int distance = 1; distance <= static_cast<int>(range); ++distance){
+            const int column = origin_column + column_step * distance;
+            const int row = origin_row + row_step * distance;
+            if(!map_.contains(column, row) || map_.at(column, row).type == TileType::wall){
+                break;
+            }
+
+            effect.tile_centres.push_back(tile_centre(column, row));
+        }
+    }
+
     void Application::update_camera(float delta_time) noexcept{
         (void) delta_time; // name the argument to avoid the static analyzer yelling at us. :) We'll animate the camera later.
         camera_.set_viewport_size(window_.size());
@@ -274,6 +343,34 @@ namespace kotte
         std::size_t exact_visibility_tests = 0;
         std::size_t visible_entities = 0;
         renderer_.clear();
+
+        // Blast effects are short-lived presentation values, not authoritative
+        // entities. Rebuilding commands here keeps their lifetime out of gameplay.
+        constexpr float blast_inset = 3.0f;
+        for(const BlastEffect& effect : blast_effects_){
+            for(const Vector2 tile_world_centre : effect.tile_centres){
+                Rectangle bounds{
+                    tile_world_centre.x - static_cast<float>(tile_size_) / 2.0f + blast_inset,
+                    tile_world_centre.y - static_cast<float>(tile_size_) / 2.0f + blast_inset,
+                    static_cast<float>(tile_size_) - blast_inset * 2.0f,
+                    static_cast<float>(tile_size_) - blast_inset * 2.0f
+                };
+                if(!CheckCollisionRecs(bounds, world_view)){
+                    continue;
+                }
+
+                const Vector2 screen_position = camera_.world_to_screen({bounds.x, bounds.y});
+                bounds.x = screen_position.x;
+                bounds.y = screen_position.y;
+                renderer_.submit({
+                    bounds,
+                    blast_color_,
+                    RenderLayer::effect,
+                    tile_world_centre.y,
+                    0.3f
+                });
+            }
+        }
 
         // The spatial query replaces Week 3's complete entity scan. Its result is
         // only a candidate list, so every candidate still needs an exact test.
@@ -338,9 +435,10 @@ namespace kotte
         DrawText(diagnostics.c_str(), 10, 34, 20, RAYWHITE);
 
         diagnostics = std::format(
-            "enemies updated: {} | active bombs: {}",
+            "enemies updated: {} | active bombs: {} | blast effects: {}",
             collision_diagnostics_.enemy_updates,
-            active_bomb_handles_.size());
+            active_bomb_handles_.size(),
+            blast_effects_.size());
         DrawText(diagnostics.c_str(), 10, 58, 20, RAYWHITE);
 
         diagnostics = std::format(
@@ -564,9 +662,16 @@ namespace kotte
 
     Vector2 Application::tile_centre(Vector2 world_position) noexcept{
         const float tile_extent = static_cast<float>(tile_size_);
+        const int column = static_cast<int>(std::floor(world_position.x / tile_extent));
+        const int row = static_cast<int>(std::floor(world_position.y / tile_extent));
+        return tile_centre(column, row);
+    }
+
+    Vector2 Application::tile_centre(int column, int row) noexcept{
+        const float tile_extent = static_cast<float>(tile_size_);
         return {
-            std::floor(world_position.x / tile_extent) * tile_extent + tile_extent / 2.0f,
-            std::floor(world_position.y / tile_extent) * tile_extent + tile_extent / 2.0f
+            static_cast<float>(column) * tile_extent + tile_extent / 2.0f,
+            static_cast<float>(row) * tile_extent + tile_extent / 2.0f
         };
     }
 
