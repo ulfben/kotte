@@ -21,29 +21,29 @@ namespace kotte
         cells_.resize(static_cast<std::size_t>(columns_) * static_cast<std::size_t>(rows_));
     }
 
-    void SpatialGrid::insert(std::size_t entity_index, Rectangle world_bounds){
+    void SpatialGrid::insert(EntityHandle entity_handle, Rectangle world_bounds){
         const CellRange range = cells_overlapping(world_bounds);
 
-        // An entity can cross a cell boundary, so add its index to every cell
+        // An entity can cross a cell boundary, so add its handle to every cell
         // touched by its complete world-space bounds.
         for(int row = range.first_row; row < range.past_last_row; ++row){
             for(int column = range.first_column; column < range.past_last_column; ++column){
                 Cell& cell = at(column, row);
-                assert(std::ranges::find(cell, entity_index) == cell.end());
-                cell.push_back(entity_index);
+                assert(std::ranges::find(cell, entity_handle) == cell.end());
+                cell.push_back(entity_handle);
             }
         }
     }
 
-    void SpatialGrid::remove(std::size_t entity_index, Rectangle world_bounds){
+    void SpatialGrid::remove(EntityHandle entity_handle, Rectangle world_bounds){
         const CellRange range = cells_overlapping(world_bounds);
 
         // Remove the old references before an entity is inserted at its new
-        // location. The entity itself continues to live in Application's vector.
+        // location. The entity itself continues to live in the owning store.
         for(int row = range.first_row; row < range.past_last_row; ++row){
             for(int column = range.first_column; column < range.past_last_column; ++column){
                 Cell& cell = at(column, row);
-                const std::size_t removed = std::erase(cell, entity_index);
+                const std::size_t removed = std::erase(cell, entity_handle);
                 assert(removed == 1);
                 (void) removed;
             }
@@ -51,15 +51,15 @@ namespace kotte
     }
 
     void SpatialGrid::update(
-        std::size_t entity_index,
+        EntityHandle entity_handle,
         Rectangle old_world_bounds,
         Rectangle new_world_bounds){
         if(cells_overlapping(old_world_bounds) == cells_overlapping(new_world_bounds)){
             return;
         }
 
-        remove(entity_index, old_world_bounds);
-        insert(entity_index, new_world_bounds);
+        remove(entity_handle, old_world_bounds);
+        insert(entity_handle, new_world_bounds);
     }
 
     SpatialQuery SpatialGrid::query(Rectangle world_bounds) const{
@@ -73,15 +73,15 @@ namespace kotte
                 const Cell& cell = at(column, row);
                 ++result.cells_visited;
                 result.candidate_references += cell.size();
-                result.entity_indices.insert(result.entity_indices.end(), cell.begin(), cell.end());
+                result.entity_handles.insert(result.entity_handles.end(), cell.begin(), cell.end());
             }
         }
 
-        // Sorting places repeated indices next to each other. Removing them here
+        // Sorting places repeated handles next to each other. Removing them here
         // ensures that each entity receives one exact test and one command at most.
-        std::ranges::sort(result.entity_indices);
-        const auto duplicate_tail = std::ranges::unique(result.entity_indices);
-        result.entity_indices.erase(duplicate_tail.begin(), duplicate_tail.end());
+        std::ranges::sort(result.entity_handles);
+        const auto duplicate_tail = std::ranges::unique(result.entity_handles);
+        result.entity_handles.erase(duplicate_tail.begin(), duplicate_tail.end());
         return result;
     }
 

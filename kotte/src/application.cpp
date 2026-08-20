@@ -1,5 +1,6 @@
 #include "kotte/application.hpp"
 
+#include <cassert>
 #include <cmath>
 #include <format>
 #include <raymath.h>
@@ -23,7 +24,6 @@ namespace kotte
         , seed_{seed}{
         populate_entities();
         initialize_enemies();
-        populate_spatial_grid();
     }
 
     void Application::run(){
@@ -134,7 +134,7 @@ namespace kotte
         player_entity.world_position = Vector2Clamp(player_entity.world_position, minimum_position, maximum_position);
 
         const Rectangle new_world_bounds = entity_world_bounds(player_entity);
-        spatial_grid_.update(player_index_, old_world_bounds, new_world_bounds);
+        spatial_grid_.update(player_handle_, old_world_bounds, new_world_bounds);
     }
 
     void Application::try_move_player(Vector2 axis_displacement){
@@ -145,7 +145,7 @@ namespace kotte
         const Vector2 proposed_position = player_entity.world_position + axis_displacement;
 
         // Detect possible contacts using the mover's proposed collision bounds.
-        if(entity_movement_is_blocked(player_index_, proposed_position)){
+        if(entity_movement_is_blocked(player_handle_, proposed_position)){
             // Respond by rejecting only this blocked player axis.
             ++collision_diagnostics_.blocked_moves;
             return;
@@ -158,12 +158,12 @@ namespace kotte
     void Application::update_enemies(float delta_time){
         // The update list contains every enemy, not only those returned by the
         // camera query. Off-screen enemies therefore keep simulating normally.
-        for(const std::size_t enemy_index : enemy_indices_){
+        for(const EntityHandle enemy_handle : enemy_handles_){
             // Each enemy is one mover with one cardinal movement attempt.
             ++collision_diagnostics_.enemy_updates;
             ++collision_diagnostics_.movement_attempts;
 
-            Entity& enemy = entities_[enemy_index];
+            Entity& enemy = entity(enemy_handle);
             const Rectangle old_world_bounds = entity_world_bounds(enemy);
             // Propose one cardinal movement for this enemy.
             const Vector2 direction = cardinal_vector(enemy.movement_heading);
@@ -171,7 +171,7 @@ namespace kotte
             const Vector2 proposed_position = enemy.world_position + displacement;
 
             // Detect a possible contact using this enemy's proposed bounds.
-            if(entity_movement_is_blocked(enemy_index, proposed_position)){
+            if(entity_movement_is_blocked(enemy_handle, proposed_position)){
                 // Respond by turning without moving; retry the new heading next update.
                 ++collision_diagnostics_.blocked_moves;
                 ++collision_diagnostics_.enemy_turns;
@@ -183,7 +183,7 @@ namespace kotte
             const Rectangle new_world_bounds = entity_world_bounds(enemy);
 
             // Synchronize this accepted move before the next enemy query.
-            spatial_grid_.update(enemy_index, old_world_bounds, new_world_bounds);
+            spatial_grid_.update(enemy_handle, old_world_bounds, new_world_bounds);
         }
     }
 
@@ -230,9 +230,13 @@ namespace kotte
 
         // The spatial query replaces Week 3's complete entity scan. Its result is
         // only a candidate list, so every candidate still needs an exact test.
-        for(const std::size_t entity_index : spatial_query.entity_indices){
-            const Entity& entity = entities_[entity_index];
-            Rectangle bounds = entity_world_bounds(entity);
+        for(const EntityHandle entity_handle : spatial_query.entity_handles){
+            const Entity* visible_candidate = entities_.try_get(entity_handle);
+            if(visible_candidate == nullptr){
+                continue;
+            }
+
+            Rectangle bounds = entity_world_bounds(*visible_candidate);
             ++exact_visibility_tests;
             if(!CheckCollisionRecs(bounds, world_view)){
                 continue;
@@ -242,22 +246,30 @@ namespace kotte
             const Vector2 screen_position = camera_.world_to_screen({bounds.x, bounds.y});
             bounds.x = screen_position.x;
             bounds.y = screen_position.y;
-            const RenderLayer layer = entity.kind == EntityKind::bomb ? RenderLayer::ground : RenderLayer::world;
-            renderer_.submit({bounds, entity_color(entity.kind), layer, entity.world_position.y, entity_roundness(entity.kind)});
+            const RenderLayer layer = visible_candidate->kind == EntityKind::bomb
+                ? RenderLayer::ground
+                : RenderLayer::world;
+            renderer_.submit({
+                bounds,
+                entity_color(visible_candidate->kind),
+                layer,
+                visible_candidate->world_position.y,
+                entity_roundness(visible_candidate->kind)
+            });
         }
         renderer_.sort();
         renderer_.execute();
 
         std::string diagnostics;
-        const double percent_of_entities = entities_.empty()
+        const double percent_of_entities = entities_.live_count() == 0
             ? 0.0
-            : 100.0 * static_cast<double>(visible_entities) / static_cast<double>(entities_.size());
+            : 100.0 * static_cast<double>(visible_entities) / static_cast<double>(entities_.live_count());
 
         // A naive collision loop would test every entity for every movement
         // attempt. Compare that full-scan count with the local broad-phase
         // candidates; this is candidate reduction, not a measured FPS gain.
         const double naive_collision_work = static_cast<double>(collision_diagnostics_.movement_attempts)
-            * static_cast<double>(entities_.size());
+            * static_cast<double>(entities_.live_count());
         const double broad_phase_reduction = naive_collision_work == 0.0
             ? 0.0
             : 100.0 * (1.0 - static_cast<double>(collision_diagnostics_.unique_candidates) / naive_collision_work);
@@ -271,7 +283,11 @@ namespace kotte
 
         diagnostics = std::format(
             "entities: {} visible ({:.1f}% of {}) | {} visibility tests | {} commands",
-            visible_entities, percent_of_entities, entities_.size(), exact_visibility_tests, renderer_.command_count());
+            visible_entities,
+            percent_of_entities,
+            entities_.live_count(),
+            exact_visibility_tests,
+            renderer_.command_count());
         DrawText(diagnostics.c_str(), 10, 34, 20, RAYWHITE);
 
         diagnostics = std::format(
@@ -300,8 +316,13 @@ namespace kotte
     }
 
     void Application::populate_entities(){
-        entities_.reserve(map_.tile_count() / 4); // pre-allocation is a fantastic performance win. We'll have ~25% of placing an object on a tile, so tile_count/4 is a good first estimate for the capacity needed.
-        entities_.push_back({EntityKind::player, {tile_size_ * 2.5f, tile_size_ * 2.5f}});
+        // Match the generation density so initial creation does not repeatedly
+        // relocate slot storage. Handles remain valid even if this estimate grows.
+        entities_.reserve(map_.tile_count() / 4);
+
+        const Entity player_entity{EntityKind::player, {tile_size_ * 2.5f, tile_size_ * 2.5f}};
+        player_handle_ = entities_.create(player_entity);
+        spatial_grid_.insert(player_handle_, entity_world_bounds(player_entity));
 
         for(int y = 1; y < map_.height() - 1; ++y){
             for(int x = 1; x < map_.width() - 1; ++x){
@@ -317,7 +338,13 @@ namespace kotte
                     static_cast<float>(x * tile_size_ + tile_size_ / 2),
                     static_cast<float>(y * tile_size_ + tile_size_ / 2)
                 };
-                entities_.push_back({kind, world_position});
+                const Entity new_entity{kind, world_position};
+                const EntityHandle handle = entities_.create(new_entity);
+                spatial_grid_.insert(handle, entity_world_bounds(new_entity));
+
+                if(kind == EntityKind::enemy){
+                    enemy_handles_.push_back(handle);
+                }
             }
         }
     }
@@ -325,32 +352,31 @@ namespace kotte
     void Application::initialize_enemies(){
         // Finish every world-generation roll before drawing runtime headings.
         // This preserves the complete Week 4 layout for the reference seed.
-        for(std::size_t index = 0; index < entities_.size(); ++index){
-            Entity& entity = entities_[index];
-            if(entity.kind != EntityKind::enemy){
-                continue;
-            }
-
-            enemy_indices_.push_back(index);
-            entity.movement_heading = static_cast<CardinalDirection>(
+        for(const EntityHandle enemy_handle : enemy_handles_){
+            Entity& enemy = entity(enemy_handle);
+            enemy.movement_heading = static_cast<CardinalDirection>(
                 random_.next<4, std::uint8_t>());
         }
     }
 
-    void Application::populate_spatial_grid(){
-        // Entity construction is complete before the grid stores indices. Week 4
-        // keeps this vector fixed, so those non-owning indices remain valid.
-        for(std::size_t index = 0; index < entities_.size(); ++index){
-            spatial_grid_.insert(index, entity_world_bounds(entities_[index]));
-        }
+    Entity& Application::entity(EntityHandle handle) noexcept{
+        Entity* resolved = entities_.try_get(handle);
+        assert(resolved != nullptr);
+        return *resolved;
+    }
+
+    const Entity& Application::entity(EntityHandle handle) const noexcept{
+        const Entity* resolved = entities_.try_get(handle);
+        assert(resolved != nullptr);
+        return *resolved;
     }
 
     Entity& Application::player() noexcept{
-        return entities_[player_index_];
+        return entity(player_handle_);
     }
 
     const Entity& Application::player() const noexcept{
-        return entities_[player_index_];
+        return entity(player_handle_);
     }
 
     Rectangle Application::entity_world_bounds(const Entity& entity) const noexcept{
@@ -383,9 +409,9 @@ namespace kotte
     }
 
     bool Application::entity_movement_is_blocked(
-        std::size_t moving_entity_index,
+        EntityHandle moving_entity_handle,
         Vector2 proposed_position){
-        Entity proposed_entity = entities_[moving_entity_index];
+        Entity proposed_entity = entity(moving_entity_handle);
         proposed_entity.world_position = proposed_position;
 
         // Room walls are a simple boundary rule in the current map. Test the
@@ -412,24 +438,24 @@ namespace kotte
         collision_diagnostics_.cells_visited += spatial_query.cells_visited;
         collision_diagnostics_.candidate_references += spatial_query.candidate_references;
         // These counters aggregate work across movers, not globally unique entities.
-        collision_diagnostics_.unique_candidates += spatial_query.entity_indices.size();
+        collision_diagnostics_.unique_candidates += spatial_query.entity_handles.size();
 
         bool blocked = false;
 
         // Filter: remove the mover and non-solid kinds before exact testing.
-        for(const std::size_t candidate_index : spatial_query.entity_indices){
-            if(candidate_index == moving_entity_index){
+        for(const EntityHandle candidate_handle : spatial_query.entity_handles){
+            if(candidate_handle == moving_entity_handle){
                 continue;
             }
 
-            const Entity& candidate = entities_[candidate_index];
-            if(!is_solid(candidate.kind)){
+            const Entity* candidate = entities_.try_get(candidate_handle);
+            if(candidate == nullptr || !is_solid(candidate->kind)){
                 continue;
             }
 
             // Narrow phase: exact-test the remaining solid candidate.
             ++collision_diagnostics_.exact_tests;
-            if(CheckCollisionRecs(proposed_collision_bounds, entity_collision_bounds(candidate))){
+            if(CheckCollisionRecs(proposed_collision_bounds, entity_collision_bounds(*candidate))){
                 ++collision_diagnostics_.contacts;
                 blocked = true;
             }

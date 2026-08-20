@@ -2,6 +2,7 @@
 
 #include "kotte/camera.hpp"
 #include "kotte/entity.hpp"
+#include "kotte/entity_store.hpp"
 #include "kotte/random.hpp"
 #include "kotte/renderer.hpp"
 #include "kotte/spatial_grid.hpp"
@@ -65,13 +66,14 @@ namespace kotte
         void render();
         void populate_entities();
         void initialize_enemies();
-        void populate_spatial_grid();
+        [[nodiscard]] Entity& entity(EntityHandle handle) noexcept;
+        [[nodiscard]] const Entity& entity(EntityHandle handle) const noexcept;
         [[nodiscard]] Entity& player() noexcept;
         [[nodiscard]] const Entity& player() const noexcept;
         [[nodiscard]] Rectangle entity_world_bounds(const Entity& entity) const noexcept;
         [[nodiscard]] Rectangle entity_collision_bounds(const Entity& entity) const noexcept;
         [[nodiscard]] bool entity_movement_is_blocked(
-            std::size_t moving_entity_index,
+            EntityHandle moving_entity_handle,
             Vector2 proposed_position);
         [[nodiscard]] static bool is_solid(EntityKind kind) noexcept;
         [[nodiscard]] static Vector2 cardinal_vector(CardinalDirection direction) noexcept;
@@ -99,14 +101,14 @@ namespace kotte
         Camera camera_;
         Random random_;
         TileMap map_;
-        std::vector<Entity> entities_;
-        std::vector<std::size_t> enemy_indices_;
+        EntityStore entities_;
+        std::vector<EntityHandle> enemy_handles_;
         SpatialGrid spatial_grid_;
         Renderer renderer_;
         FrameActions frame_actions_;
         CollisionDiagnostics collision_diagnostics_;
         std::uint64_t seed_;
-        std::size_t player_index_ = 0;
+        EntityHandle player_handle_;
         bool exit_requested_ = false;
     };
 }

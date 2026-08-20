@@ -1,5 +1,7 @@
 #pragma once
 
+#include "kotte/entity_handle.hpp"
+
 #include <cstddef>
 #include <raylib.h>
 #include <vector>
@@ -16,7 +18,7 @@ namespace kotte
     };
 
     struct SpatialQuery final {
-        std::vector<std::size_t> entity_indices;
+        std::vector<EntityHandle> entity_handles;
         std::size_t cells_visited = 0;
         std::size_t candidate_references = 0;
     };
@@ -25,10 +27,10 @@ namespace kotte
     public:
         SpatialGrid(Vector2 world_size, float cell_size);
 
-        void insert(std::size_t entity_index, Rectangle world_bounds);
-        void remove(std::size_t entity_index, Rectangle world_bounds);
+        void insert(EntityHandle entity_handle, Rectangle world_bounds);
+        void remove(EntityHandle entity_handle, Rectangle world_bounds);
         void update(
-            std::size_t entity_index,
+            EntityHandle entity_handle,
             Rectangle old_world_bounds,
             Rectangle new_world_bounds);
 
@@ -39,7 +41,7 @@ namespace kotte
         [[nodiscard]] float cell_size() const noexcept;
 
     private:
-        using Cell = std::vector<std::size_t>;
+        using Cell = std::vector<EntityHandle>;
 
         [[nodiscard]] CellRange cells_overlapping(Rectangle world_bounds) const noexcept;
         [[nodiscard]] Cell& at(int column, int row) noexcept;
