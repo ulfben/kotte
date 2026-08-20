@@ -9,6 +9,7 @@ namespace kotte
 {
     enum class RenderLayer : std::uint8_t {
         ground,
+        effect,
         world
     };
 
