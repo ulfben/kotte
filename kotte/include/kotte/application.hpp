@@ -54,7 +54,7 @@ namespace kotte
         void begin_frame() noexcept;
         void collect_frame_actions() noexcept;
         void update_movers(float delta_time);
-        void update_timed_entities(float delta_time) noexcept;
+        void update_timed_gameplay(float delta_time) noexcept;
         void resolve_gameplay_facts() noexcept;
         void apply_structural_mutations() noexcept;
         void update_presentation(float delta_time) noexcept;

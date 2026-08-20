@@ -37,7 +37,7 @@ namespace kotte
         // 1. Reset frame-local state.
         // 2. Translate input into gameplay intent.
         // 3. Update ordinary movers.
-        // 4. Update timed entities independently of camera visibility.
+        // 4. Update timed gameplay independently of camera visibility.
         // 5. Resolve gameplay facts into response decisions.
         // 6. Apply structural mutations at one synchronization point.
         // 7. Update presentation state from the synchronized world.
@@ -48,7 +48,7 @@ namespace kotte
         begin_frame();
         collect_frame_actions();
         update_movers(delta_time);
-        update_timed_entities(delta_time);
+        update_timed_gameplay(delta_time);
         resolve_gameplay_facts();
         apply_structural_mutations();
         update_presentation(delta_time);
@@ -91,7 +91,7 @@ namespace kotte
         update_enemies(delta_time);
     }
 
-    void Application::update_timed_entities(float delta_time) noexcept{
+    void Application::update_timed_gameplay(float delta_time) noexcept{
         // Bomb fuses will live here so camera visibility never controls simulation.
         (void) delta_time;
     }
