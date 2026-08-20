@@ -46,7 +46,18 @@ namespace kotte
         void request_exit() noexcept;
 
     private:
-        void update(float delta_time);
+        struct FrameActions final {
+            Vector2 player_movement_direction{};
+        };
+
+        void run_frame(float delta_time);
+        void begin_frame() noexcept;
+        void collect_frame_actions() noexcept;
+        void update_movers(float delta_time);
+        void update_timed_entities(float delta_time) noexcept;
+        void resolve_gameplay_facts() noexcept;
+        void apply_structural_mutations() noexcept;
+        void update_presentation(float delta_time) noexcept;
         void update_player(float delta_time);
         void try_move_player(Vector2 axis_displacement);
         void update_enemies(float delta_time);
@@ -92,6 +103,7 @@ namespace kotte
         std::vector<std::size_t> enemy_indices_;
         SpatialGrid spatial_grid_;
         Renderer renderer_;
+        FrameActions frame_actions_;
         CollisionDiagnostics collision_diagnostics_;
         std::uint64_t seed_;
         std::size_t player_index_ = 0;

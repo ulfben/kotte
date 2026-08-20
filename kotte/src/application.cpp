@@ -28,51 +28,94 @@ namespace kotte
 
     void Application::run(){
         while(!window_.should_close() && !exit_requested_){
-            update(GetFrameTime());            
-            render();
+            run_frame(GetFrameTime());
         }
     }
 
-    void Application::update(float delta_time){
-        collision_diagnostics_ = {};
+    void Application::run_frame(float delta_time){
+        // Full frame order:
+        // 1. Reset frame-local state.
+        // 2. Translate input into gameplay intent.
+        // 3. Update ordinary movers.
+        // 4. Update timed entities independently of camera visibility.
+        // 5. Resolve gameplay facts into response decisions.
+        // 6. Apply structural mutations at one synchronization point.
+        // 7. Update presentation state from the synchronized world.
+        // 8. Extract, sort, and draw this frame's presentation values.
+        //
+        // Keeping one call site per phase makes event lifetime and mutation
+        // boundaries visible as the simulation grows.
+        begin_frame();
+        collect_frame_actions();
+        update_movers(delta_time);
+        update_timed_entities(delta_time);
+        resolve_gameplay_facts();
+        apply_structural_mutations();
+        update_presentation(delta_time);
+        render();
+    }
 
+    void Application::begin_frame() noexcept{
+        frame_actions_ = {};
+        collision_diagnostics_ = {};
+    }
+
+    void Application::collect_frame_actions() noexcept{
         if(IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_Q)){
             request_exit();
         }
 
+        Vector2& movement_direction = frame_actions_.player_movement_direction;
+        if(IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)){
+            movement_direction.x -= 1.0f;
+        }
+        if(IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)){
+            movement_direction.x += 1.0f;
+        }
+        if(IsKeyDown(KEY_UP) || IsKeyDown(KEY_W)){
+            movement_direction.y -= 1.0f;
+        }
+        if(IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S)){
+            movement_direction.y += 1.0f;
+        }
+
+        // Normalize intent before simulation so bindings cannot change movement speed.
+        if(movement_direction.x != 0.0f || movement_direction.y != 0.0f){
+            movement_direction = Vector2Normalize(movement_direction);
+        }
+    }
+
+    void Application::update_movers(float delta_time){
         // The player and every enemy are movers; each asks its own collision question.
         update_player(delta_time);
         update_enemies(delta_time);
+    }
+
+    void Application::update_timed_entities(float delta_time) noexcept{
+        // Bomb fuses will live here so camera visibility never controls simulation.
+        (void) delta_time;
+    }
+
+    void Application::resolve_gameplay_facts() noexcept{
+        // Producers and consumers remain separate even while this phase is empty.
+    }
+
+    void Application::apply_structural_mutations() noexcept{
+        // Entity storage and every derived index will change only at this boundary.
+    }
+
+    void Application::update_presentation(float delta_time) noexcept{
         update_camera(delta_time);
     }
 
     void Application::update_player(float delta_time){
-        Vector2 direction{};
-        if(IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)){
-            direction.x -= 1.0f;
-        }
-        if(IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)){
-            direction.x += 1.0f;
-        }
-        if(IsKeyDown(KEY_UP) || IsKeyDown(KEY_W)){
-            direction.y -= 1.0f;
-        }
-        if(IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S)){
-            direction.y += 1.0f;
-        }
-
-        // Two held keys produce a longer diagonal vector. Normalize it so the
-        // player's speed is the same in every direction before scaling it.
-        if(direction.x != 0.0f || direction.y != 0.0f){
-            direction = Vector2Normalize(direction);
-        }
+        const Vector2 direction = frame_actions_.player_movement_direction;
 
         Entity& player_entity = player();
         const Rectangle old_world_bounds = entity_world_bounds(player_entity);
         const Vector2 displacement = direction * (player_speed_ * delta_time);
 
-        // Treat the two axes as separate proposed movements. Week 5 will use
-        // this split to let a clear axis slide along a blocked one.
+        // Separate proposals let a clear axis slide along a blocked one.
         if(displacement.x != 0.0f){
             try_move_player({displacement.x, 0.0f});
         }
