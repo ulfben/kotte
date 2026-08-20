@@ -1,5 +1,6 @@
 #include "kotte/application.hpp"
 
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <format>
@@ -36,7 +37,7 @@ namespace kotte
         // Full frame order:
         // 1. Reset frame-local state.
         // 2. Translate input into gameplay intent.
-        // 3. Update ordinary movers.
+        // 3. Update ordinary gameplay and queue structural requests.
         // 4. Update timed gameplay independently of camera visibility.
         // 5. Resolve gameplay facts into response decisions.
         // 6. Apply structural mutations at one synchronization point.
@@ -47,7 +48,7 @@ namespace kotte
         // boundaries visible as the simulation grows.
         begin_frame();
         collect_frame_actions();
-        update_movers(delta_time);
+        update_gameplay(delta_time);
         update_timed_gameplay(delta_time);
         resolve_gameplay_facts();
         apply_structural_mutations();
@@ -56,6 +57,8 @@ namespace kotte
     }
 
     void Application::begin_frame() noexcept{
+        // Every request must be consumed by the previous frame's mutation phase.
+        assert(place_bomb_requests_.empty());
         frame_actions_ = {};
         collision_diagnostics_ = {};
     }
@@ -64,6 +67,7 @@ namespace kotte
         if(IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_Q)){
             request_exit();
         }
+        frame_actions_.place_bomb = IsKeyPressed(KEY_SPACE);
 
         Vector2& movement_direction = frame_actions_.player_movement_direction;
         if(IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)){
@@ -85,10 +89,11 @@ namespace kotte
         }
     }
 
-    void Application::update_movers(float delta_time){
+    void Application::update_gameplay(float delta_time){
         // The player and every enemy are movers; each asks its own collision question.
         update_player(delta_time);
         update_enemies(delta_time);
+        queue_bomb_placement();
     }
 
     void Application::update_timed_gameplay(float delta_time) noexcept{
@@ -100,8 +105,9 @@ namespace kotte
         // Producers and consumers remain separate even while this phase is empty.
     }
 
-    void Application::apply_structural_mutations() noexcept{
-        // Entity storage and every derived index will change only at this boundary.
+    void Application::apply_structural_mutations(){
+        // Entity storage and every derived index change only at this boundary.
+        apply_bomb_placements();
     }
 
     void Application::update_presentation(float delta_time) noexcept{
@@ -185,6 +191,47 @@ namespace kotte
             // Synchronize this accepted move before the next enemy query.
             spatial_grid_.update(enemy_handle, old_world_bounds, new_world_bounds);
         }
+    }
+
+    void Application::queue_bomb_placement(){
+        if(!frame_actions_.place_bomb){
+            return;
+        }
+
+        // Capture values rather than an Entity reference because the request
+        // deliberately outlives this simulation phase.
+        place_bomb_requests_.push_back({
+            player_handle_,
+            tile_centre(player().world_position)
+        });
+    }
+
+    void Application::apply_bomb_placements(){
+        for(const PlaceBombRequest& request : place_bomb_requests_){
+            const Entity* owner = entities_.try_get(request.owner);
+            if(owner == nullptr || owner->kind != EntityKind::player
+                || owner_has_active_bomb(request.owner)){
+                continue;
+            }
+
+            const Entity bomb{
+                .kind = EntityKind::bomb,
+                .world_position = request.world_position,
+                .bomb_state = BombState{
+                    .owner = request.owner,
+                    .fuse_remaining = bomb_fuse_seconds_,
+                    .blast_range = bomb_blast_range_
+                }
+            };
+            const EntityHandle bomb_handle = entities_.create(bomb);
+
+            // The store owns the bomb; these handles are synchronized, non-owning
+            // views used by spatial queries and timed gameplay.
+            spatial_grid_.insert(bomb_handle, entity_world_bounds(bomb));
+            active_bomb_handles_.push_back(bomb_handle);
+        }
+
+        place_bomb_requests_.clear();
     }
 
     void Application::update_camera(float delta_time) noexcept{
@@ -291,7 +338,9 @@ namespace kotte
         DrawText(diagnostics.c_str(), 10, 34, 20, RAYWHITE);
 
         diagnostics = std::format(
-            "enemies updated: {}", collision_diagnostics_.enemy_updates);
+            "enemies updated: {} | active bombs: {}",
+            collision_diagnostics_.enemy_updates,
+            active_bomb_handles_.size());
         DrawText(diagnostics.c_str(), 10, 58, 20, RAYWHITE);
 
         diagnostics = std::format(
@@ -312,7 +361,7 @@ namespace kotte
             "world: {} x {} tiles | {} total", map_.width(), map_.height(), map_.tile_count());
         DrawText(diagnostics.c_str(), 10, window_.height() - 54, 20, RAYWHITE);
 
-        DrawText("move: WASD/arrows | quit: Q/Escape", 10, window_.height() - 30, 20, LIGHTGRAY);
+        DrawText("move: WASD/arrows | bomb: Space | quit: Q/Escape", 10, window_.height() - 30, 20, LIGHTGRAY);
     }
 
     void Application::populate_entities(){
@@ -331,9 +380,12 @@ namespace kotte
                 }
 
                 const std::uint8_t kind_roll = random_.next<20, std::uint8_t>();
-                const EntityKind kind = kind_roll < 15
-                    ? EntityKind::crate
-                    : kind_roll < 19 ? EntityKind::bomb : EntityKind::enemy;
+                // Week 3's inert bomb markers are no longer needed: every bomb
+                // now enters the world through the explicit lifetime path.
+                if(kind_roll >= 15 && kind_roll < 19){
+                    continue;
+                }
+                const EntityKind kind = kind_roll < 15 ? EntityKind::crate : EntityKind::enemy;
                 const Vector2 world_position{
                     static_cast<float>(x * tile_size_ + tile_size_ / 2),
                     static_cast<float>(y * tile_size_ + tile_size_ / 2)
@@ -499,6 +551,23 @@ namespace kotte
         const std::uint8_t new_value = static_cast<std::uint8_t>(
             (current_value + offset) % direction_count);
         return static_cast<CardinalDirection>(new_value);
+    }
+
+    bool Application::owner_has_active_bomb(EntityHandle owner) const noexcept{
+        return std::ranges::any_of(active_bomb_handles_, [this, owner](EntityHandle bomb_handle){
+            const Entity* bomb = entities_.try_get(bomb_handle);
+            return bomb != nullptr
+                && bomb->bomb_state.has_value()
+                && bomb->bomb_state->owner == owner;
+        });
+    }
+
+    Vector2 Application::tile_centre(Vector2 world_position) noexcept{
+        const float tile_extent = static_cast<float>(tile_size_);
+        return {
+            std::floor(world_position.x / tile_extent) * tile_extent + tile_extent / 2.0f,
+            std::floor(world_position.y / tile_extent) * tile_extent + tile_extent / 2.0f
+        };
     }
 
     Color Application::entity_color(EntityKind kind) noexcept{

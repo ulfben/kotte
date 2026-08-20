@@ -56,12 +56,40 @@ namespace
         require(store.contains(player_handle), "Growing slot storage must not invalidate an existing handle.");
         require(store.contains(crate_handle), "The handle created after storage growth must resolve.");
     }
+
+    void relationships_do_not_keep_stale_owners_alive(){
+        kotte::EntityStore store;
+
+        const kotte::EntityHandle player_handle = store.create({kotte::EntityKind::player});
+        const kotte::EntityHandle bomb_handle = store.create({
+            .kind = kotte::EntityKind::bomb,
+            .bomb_state = kotte::BombState{
+                .owner = player_handle,
+                .fuse_remaining = 2.0f,
+                .blast_range = 3
+            }
+        });
+
+        require(store.destroy(player_handle), "The relationship must not own the player lifetime.");
+        const kotte::EntityHandle replacement = store.create({kotte::EntityKind::enemy});
+
+        const kotte::Entity* bomb = store.try_get(bomb_handle);
+        if(bomb == nullptr || !bomb->bomb_state.has_value()){
+            throw std::runtime_error{"The bomb must retain its relationship value."};
+        }
+
+        const kotte::EntityHandle retained_owner = bomb->bomb_state->owner;
+        require(retained_owner == player_handle, "The bomb must still identify its original owner.");
+        require(!store.contains(retained_owner), "A relationship must validate its handle before use.");
+        require(replacement.slot == player_handle.slot, "The test must exercise owner-slot reuse.");
+    }
 }
 
 int main(){
     try{
         stale_handle_cannot_access_a_reused_slot();
         handles_survive_storage_reallocation();
+        relationships_do_not_keep_stale_owners_alive();
         std::println("EntityStore tests passed.");
         return 0;
     } catch(const std::exception& error){

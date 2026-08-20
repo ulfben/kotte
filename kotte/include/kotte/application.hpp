@@ -49,19 +49,27 @@ namespace kotte
     private:
         struct FrameActions final {
             Vector2 player_movement_direction{};
+            bool place_bomb = false;
+        };
+
+        struct PlaceBombRequest final {
+            EntityHandle owner;
+            Vector2 world_position{};
         };
 
         void run_frame(float delta_time);
         void begin_frame() noexcept;
         void collect_frame_actions() noexcept;
-        void update_movers(float delta_time);
+        void update_gameplay(float delta_time);
         void update_timed_gameplay(float delta_time) noexcept;
         void resolve_gameplay_facts() noexcept;
-        void apply_structural_mutations() noexcept;
+        void apply_structural_mutations();
         void update_presentation(float delta_time) noexcept;
         void update_player(float delta_time);
         void try_move_player(Vector2 axis_displacement);
         void update_enemies(float delta_time);
+        void queue_bomb_placement();
+        void apply_bomb_placements();
         void update_camera(float delta_time) noexcept;
         void render();
         void populate_entities();
@@ -78,6 +86,8 @@ namespace kotte
         [[nodiscard]] static bool is_solid(EntityKind kind) noexcept;
         [[nodiscard]] static Vector2 cardinal_vector(CardinalDirection direction) noexcept;
         [[nodiscard]] CardinalDirection different_enemy_direction(CardinalDirection current_direction);
+        [[nodiscard]] bool owner_has_active_bomb(EntityHandle owner) const noexcept;
+        [[nodiscard]] static Vector2 tile_centre(Vector2 world_position) noexcept;
         [[nodiscard]] static Color entity_color(EntityKind kind) noexcept;
         [[nodiscard]] static float entity_roundness(EntityKind kind) noexcept;
         static constexpr int tile_size_ = 40;
@@ -85,6 +95,8 @@ namespace kotte
         static constexpr float spatial_cell_size_ = tile_size_ * spatial_cell_tiles_;
         static constexpr float player_speed_ = 240.0f;
         static constexpr float enemy_speed_ = 80.0f;
+        static constexpr float bomb_fuse_seconds_ = 2.0f;
+        static constexpr std::uint8_t bomb_blast_range_ = 3;
         static constexpr Color background_color_{0x11, 0x22, 0x33, 0xff};
         static constexpr Color floor_colors_[3]{
             Color{0x38, 0x49, 0x52, 0xff},
@@ -103,9 +115,11 @@ namespace kotte
         TileMap map_;
         EntityStore entities_;
         std::vector<EntityHandle> enemy_handles_;
+        std::vector<EntityHandle> active_bomb_handles_;
         SpatialGrid spatial_grid_;
         Renderer renderer_;
         FrameActions frame_actions_;
+        std::vector<PlaceBombRequest> place_bomb_requests_;
         CollisionDiagnostics collision_diagnostics_;
         std::uint64_t seed_;
         EntityHandle player_handle_;
